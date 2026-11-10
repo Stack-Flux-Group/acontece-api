@@ -2,6 +2,15 @@
 
 API REST desenvolvida em kotlin para gerenciamento de eventos, inscrições e participantes da plataforma Acontece
 
+# Rodar o projeto
+
+.\mvnw spring-boot:run
+
+# Endereços para testar
+
+- Swagger: http://localhost:8080/swagger-ui.html
+- Console do H2: http://localhost:8080/h2-console
+
 ## Estrutura do Projeto
 
 ```
