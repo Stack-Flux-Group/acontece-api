@@ -1,4 +1,4 @@
-package acontece.api.model.enums
+package acontece.api.enums
 
 enum class StatusInscricao {
     PENDENTE,
