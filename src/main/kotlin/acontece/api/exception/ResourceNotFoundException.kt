@@ -1,3 +1,3 @@
 package acontece.api.exception
 
-class ResourceNotFoundException
+class ResourceNotFoundException(message: String) : RuntimeException(message)
