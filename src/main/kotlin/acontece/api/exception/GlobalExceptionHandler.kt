@@ -12,50 +12,80 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 
+// @RestControllerAdvice: "escuta" exceções lançadas por QUALQUER controller
+// e transforma em uma resposta JSON amigável.
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     @ExceptionHandler(ResourceNotFoundException::class)
-    fun handleNotFound(ex: ResourceNotFoundException, request: HttpServletRequest):
-            ResponseEntity<ApiError> =
+    fun handleNotFound(
+        ex: ResourceNotFoundException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiError> =
         build(HttpStatus.NOT_FOUND, ex.message ?: "Recurso não encontrado", request)
 
     @ExceptionHandler(ConflictException::class)
-    fun handleConflict(ex: ConflictException, request: HttpServletRequest):
-            ResponseEntity<ApiError> =
+    fun handleConflict(
+        ex: ConflictException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiError> =
         build(HttpStatus.CONFLICT, ex.message ?: "Conflito de dados", request)
 
+    // 400 - regras de negócio (CEP inválido, data fim antes do início...)
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleBusinessRule(
+        ex: IllegalArgumentException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiError> =
+        build(HttpStatus.BAD_REQUEST, ex.message ?: "Requisição inválida", request)
+
     @ExceptionHandler(MethodArgumentNotValidException::class)
-    fun handleValidation(ex: MethodArgumentNotValidException, request: HttpServletRequest):
-            ResponseEntity<ApiError> {
-        val violations = ex.bindingResult.fieldErrors.map {
-            FieldViolation(field = it.field, message = it.defaultMessage ?: "Valor inválido")
-        }
+    fun handleValidation(
+        ex: MethodArgumentNotValidException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiError> {
+        val violations =
+            ex.bindingResult.fieldErrors.map {
+                FieldViolation(field = it.field, message = it.defaultMessage ?: "Valor inválido")
+            }
         return build(HttpStatus.BAD_REQUEST, "Dados inválidos na requisição", request, violations)
     }
 
     @ExceptionHandler(HttpMessageNotReadableException::class)
-    fun handleUnreadable(ex: HttpMessageNotReadableException, request: HttpServletRequest):
-            ResponseEntity<ApiError> =
+    fun handleUnreadable(
+        ex: HttpMessageNotReadableException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiError> =
         build(HttpStatus.BAD_REQUEST, "Corpo de requisição ausente ou JSON malformado", request)
 
     @ExceptionHandler(MethodArgumentTypeMismatchException::class)
-    fun handleTypeMismatch(ex: MethodArgumentTypeMismatchException, request: HttpServletRequest):
-            ResponseEntity<ApiError> =
+    fun handleTypeMismatch(
+        ex: MethodArgumentTypeMismatchException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiError> =
         build(HttpStatus.BAD_REQUEST, "Parametro '${ex.name}' com valor inválido", request)
 
     @ExceptionHandler(DataIntegrityViolationException::class)
-    fun handleIntegrity(ex: DataIntegrityViolationException, request: HttpServletRequest):
-            ResponseEntity<ApiError> {
-        log.warn("Violação de integridade em {}: {}", request.requestURI, ex.mostSpecificCause.message)
-        return build(HttpStatus.CONFLICT, "Operação viola uma regra de integridade dos dados", request)
+    fun handleIntegrity(
+        ex: DataIntegrityViolationException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiError> {
+        log.warn(
+            "Violação de integridade em {}: {}",
+            request.requestURI,
+            ex.mostSpecificCause.message,
+        )
+        return build(
+            HttpStatus.CONFLICT,
+            "Operação viola uma regra de integridade dos dados",
+            request,
+        )
     }
 
     @ExceptionHandler(Exception::class)
-    fun handleUnexpected(ex: Exception, request: HttpServletRequest):
-            ResponseEntity<ApiError> {
+    fun handleUnexpected(ex: Exception, request: HttpServletRequest): ResponseEntity<ApiError> {
         if (ex is ErrorResponse) {
             val status = HttpStatus.valueOf(ex.statusCode.value())
             return build(status, ex.body.detail ?: status.reasonPhrase, request)
@@ -68,15 +98,16 @@ class GlobalExceptionHandler {
         status: HttpStatus,
         message: String,
         request: HttpServletRequest,
-        violations: List<FieldViolation> = emptyList()
+        violations: List<FieldViolation> = emptyList(),
     ): ResponseEntity<ApiError> =
-        ResponseEntity.status(status).body(
-            ApiError(
-                status = status.value(),
-                error = status.reasonPhrase,
-                message = message,
-                path = request.requestURI,
-                fieldErrors = violations
+        ResponseEntity.status(status)
+            .body(
+                ApiError(
+                    status = status.value(),
+                    error = status.reasonPhrase,
+                    message = message,
+                    path = request.requestURI,
+                    fieldErrors = violations,
+                )
             )
-        )
 }
