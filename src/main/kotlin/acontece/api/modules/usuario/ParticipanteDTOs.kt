@@ -10,7 +10,7 @@ data class ParticipanteRequest(
 
     @field:NotBlank(message = "O nome é obrigatorio")
     @field:Size(max = 120, message = "O nome deve ter no maximo 120 caracteres")
-    val nome: String,
+    val nome: String = "",
 
     @field:NotBlank(message = "O e-mail é obrigatório")
     @field:Email(message = "E-mail inválido")
@@ -23,7 +23,7 @@ data class ParticipanteRequest(
     @field:Pattern(regexp = """^\d{10,11}$""", message = "O telefone deve ter 10 ou 11 digitos, somente numeros")
     val telefone: String? = null
 ) {
-    fun normalizar() = copy(
+    fun normalizado() = copy(
         nome = nome.trim(),
         email = email.trim().lowercase(),
         cpf = cpf.filter(Char::isDigit)
@@ -34,6 +34,29 @@ data class ParticipanteRequest(
         email = email,
         cpf = cpf,
         telefone = telefone
+    )
+}
+
+data class ParticipantePatchRequest(
+    @field:Size(max = 120, message = "O nome deve ter no maximo 120 caracteres")
+    @field:Pattern(regexp = """.*\S.*""", message = "O nome não pode ficar em branco")
+    val nome: String? = null,
+
+    @field:Email(message = "Email inválido")
+    @field:Pattern(regexp = """.*\S.*""", message = "O email não pode ficar em branco")
+    val email: String? = null,
+
+    @field:CPF(message = "CPF inválido")
+    @field:Pattern(regexp = """.*\S.*""", message = "O CPF não pode ficar em branco")
+    val cpf: String? = null,
+
+    @field:Pattern(regexp = """^(\d{10,11})?$""", message = "O telefone deve ter 10 ou 11 digitos, somente numeros")
+    val telefone: String? = null,
+) {
+    fun normalizado() = copy(
+        nome = nome?.trim(),
+        email = email?.trim()?.lowercase(),
+        cpf = cpf?.filter(Char::isDigit)
     )
 }
 
