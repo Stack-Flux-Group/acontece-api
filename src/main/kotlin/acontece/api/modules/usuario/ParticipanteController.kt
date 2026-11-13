@@ -37,7 +37,10 @@ class ParticipanteController(
     fun listar(pageable: Pageable): PagedModel<ParticipanteResponse> =
         PagedModel(service.listar(pageable))
 
-    @PatchMapping
+    @GetMapping("/{id}")
+    fun buscarPorId(@PathVariable id: Long): ParticipanteResponse = service.buscarPorId(id)
+
+    @PatchMapping("/{id}")
     fun atualizar(
         @PathVariable id: Long,
         @Valid @RequestBody request: ParticipantePatchRequest
