@@ -15,6 +15,10 @@ API REST desenvolvida em kotlin para gerenciamento de eventos, inscrições e pa
 - Swagger: http://localhost:8080/swagger-ui.html
 - Console do H2: http://localhost:8080/h2-console
 
+# API Online
+
+https://acontece-api.onrender.com/swagger-ui/index.html
+
 ## Estrutura do Projeto
 
 ```
