@@ -2,16 +2,13 @@ package acontece.api.exception
 
 import java.time.Instant
 
-data class ApiError(
+data class ErrorResponse(
     val timestamp: Instant = Instant.now(),
     val status: Int,
     val error: String,
     val message: String,
     val path: String,
-    val fieldErrors: List<FieldViolation> = emptyList()
+    val fieldErrors: List<FieldViolation> = emptyList(),
 )
 
-data class FieldViolation(
-    val field: String,
-    val message: String
-)
+data class FieldViolation(val field: String, val message: String)
