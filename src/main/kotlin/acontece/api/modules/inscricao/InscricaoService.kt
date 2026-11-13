@@ -6,6 +6,8 @@ import acontece.api.exception.ResourceNotFoundException
 import acontece.api.modules.evento.EventoRepository
 import acontece.api.modules.usuario.ParticipanteRepository
 import java.time.LocalDateTime
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -52,8 +54,49 @@ class InscricaoService(
         return repository.save(Inscricao(participante = participante, evento = evento)).toResponse()
     }
 
+    @Transactional(readOnly = true)
+    fun buscarPorId(id: Long): InscricaoResponse = obter(id).toResponse()
+
+    // O map { } roda aqui dentro, com a transação aberta, porque toResponse() lê participante e
+    // evento (LAZY).
+    @Transactional(readOnly = true)
+    fun listar(
+        eventoId: Long?,
+        participanteId: Long?,
+        status: StatusInscricao?,
+        pageable: Pageable,
+    ): Page<InscricaoResponse> =
+        repository.buscar(eventoId, participanteId, status, pageable).map { it.toResponse() }
+
+    // Sem trava: confirmar ou cancelar nunca ocupa vaga nova (CANCELADA é final e reinscrever cria
+    // uma linha nova).
+    @Transactional
+    fun atualizarStatus(id: Long, request: AtualizarStatusRequest): InscricaoResponse {
+        val novoStatus = requireNotNull(request.status) { "O status é obrigatório" }
+        val inscricao = obter(id)
+
+        if (novoStatus !in TRANSICOES.getValue(inscricao.status)) {
+            throw ConflictException("Transição de status inválida: ${inscricao.status} → $novoStatus")
+        }
+
+        inscricao.status = novoStatus // JPA grava sozinho ao fim da transação
+        return inscricao.toResponse()
+    }
+
+    private fun obter(id: Long): Inscricao =
+        repository.findByIdOrNull(id) ?: throw ResourceNotFoundException("Inscrição $id não encontrada")
+
     private companion object {
         // Status que ocupam vaga. CANCELADA libera.
         val STATUS_ATIVOS = listOf(StatusInscricao.PENDENTE, StatusInscricao.CONFIRMADA)
+
+        // Para cada status atual, os status para os quais ele pode ir.
+        val TRANSICOES =
+            mapOf(
+                StatusInscricao.PENDENTE to
+                    setOf(StatusInscricao.CONFIRMADA, StatusInscricao.CANCELADA),
+                StatusInscricao.CONFIRMADA to setOf(StatusInscricao.CANCELADA),
+                StatusInscricao.CANCELADA to emptySet<StatusInscricao>(),
+            )
     }
 }
