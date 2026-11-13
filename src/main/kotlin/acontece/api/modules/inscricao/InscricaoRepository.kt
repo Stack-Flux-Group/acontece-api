@@ -1,9 +1,11 @@
 package acontece.api.modules.inscricao
 
 import acontece.api.enums.StatusInscricao
+import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
@@ -17,6 +19,13 @@ interface InscricaoRepository : JpaRepository<Inscricao, Long> {
         eventoId: Long,
         statuses: Collection<StatusInscricao>,
     ): Boolean
+
+    // Busca a inscrição travando a linha (SELECT ... FOR UPDATE) até o fim da transação. Dois PATCH
+    // simultâneos na mesma inscrição passam um de cada vez, então a validação da transição sempre
+    // enxerga o status já gravado pelo anterior. Só funciona dentro de uma @Transactional.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM Inscricao i WHERE i.id = :id")
+    fun buscarParaAtualizar(@Param("id") id: Long): Inscricao?
 
     // Cada filtro é ignorado quando vem nulo: "IS NULL OR ..." deixa a condição sempre verdadeira.
     @Query(
