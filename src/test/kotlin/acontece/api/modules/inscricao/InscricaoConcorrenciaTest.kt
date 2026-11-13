@@ -54,8 +54,11 @@ class InscricaoConcorrenciaTest {
     }
 
     // A ordem importa: inscrições referenciam participantes e eventos.
+    // O JUnit roda o @AfterTest mesmo quando o @BeforeTest falha, então a guarda se repete aqui:
+    // sem ela, uma configuração errada apagaria os dados do banco que estivesse configurado.
     @AfterTest
     fun limpar() {
+        garantirQueEstaNoH2()
         repository.deleteAll()
         participantes.deleteAll()
         eventos.deleteAll()
