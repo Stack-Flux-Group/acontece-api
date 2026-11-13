@@ -4,6 +4,7 @@ import acontece.api.enums.StatusInscricao
 import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
@@ -28,6 +29,10 @@ interface InscricaoRepository : JpaRepository<Inscricao, Long> {
     fun buscarParaAtualizar(@Param("id") id: Long): Inscricao?
 
     // Cada filtro é ignorado quando vem nulo: "IS NULL OR ..." deixa a condição sempre verdadeira.
+    // @EntityGraph busca participante e evento no mesmo SELECT (JOIN). Sem ele, a resposta de cada
+    // linha dispararia mais duas consultas (participante e evento são LAZY), o que numa página de
+    // 20 inscrições seriam 41 idas ao banco. É seguro com paginação porque são relações *ToOne.
+    @EntityGraph(attributePaths = ["participante", "evento"])
     @Query(
         """
         SELECT i FROM Inscricao i
