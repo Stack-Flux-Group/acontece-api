@@ -47,8 +47,11 @@ Regras que são decisão minha (o usuário não as viu uma a uma, ajustar se nã
   mesmo evento: 409.
 - Transições permitidas: `PENDENTE → CONFIRMADA`, `PENDENTE → CANCELADA`, `CONFIRMADA → CANCELADA`.
   `CANCELADA` é final. Qualquer outra transição, inclusive repetir o status atual, dá 409.
-- Como `CANCELADA` é final e reinscrever cria uma linha nova, mudar status nunca ocupa vaga. Só a
-  criação precisa ser protegida contra concorrência.
+- Como `CANCELADA` é final e reinscrever cria uma linha nova, mudar status nunca ocupa vaga. Mesmo
+  assim a transição precisa ser atômica: o service trava a linha da inscrição ao mudar o status,
+  senão dois pedidos simultâneos leriam o mesmo status e o último a gravar venceria (por exemplo,
+  `CANCELADA → CONFIRMADA`). A criação é protegida pela trava no evento. (Ajustado após a revisão
+  final.)
 
 ## Contrato da API
 
@@ -89,7 +92,9 @@ O enum `StatusInscricao` já existe em `acontece.api.enums` e não muda.
 ## Deixado ao construtor
 
 - Como montar a listagem com filtros opcionais (`@Query` com `is null` ou `Specification`).
-- Se o service recebe um `Clock` para testar "evento encerrado" sem depender da data real.
+- ~~Se o service recebe um `Clock`~~ Decidido na revisão final: o service recebe um `Clock` com
+  fuso `America/Sao_Paulo` (`ClockConfig`), porque as datas do evento são horário de Brasília sem
+  fuso e o servidor de produção roda em UTC.
 - Nomes dos métodos de repository e a estrutura exata dos DTOs, seguindo `ParticipanteDTOs.kt`.
 
 ## Testes
@@ -99,5 +104,5 @@ Sem tocar no banco real do Supabase:
 - Service e repository com `@DataJpaTest` (H2 em memória, já no classpath): vagas, duplicidade,
   reinscrição, evento encerrado, cada transição de status.
 - Controller com `@WebMvcTest` e service simulado, como em `ParticipanteControllerTest`.
-- O `contextLoads` existente continua conectando no banco real e não deve ser usado para validar
-  esta etapa.
+- Após a revisão final, `src/test/resources/application.properties` aponta todos os testes para o
+  H2. Nenhum teste conecta no Supabase, inclusive o `contextLoads`, e `./mvnw test` é seguro.
