@@ -131,6 +131,43 @@ class InscricaoConcorrenciaTest {
     }
 
     @Test
+    fun `varias confirmacoes simultaneas da mesma inscricao so uma vence`() {
+        val evento = novoEvento(vagas = 10)
+        val inscricao = repository.save(Inscricao(participante = novoParticipante(), evento = evento))
+        val pool = Executors.newFixedThreadPool(5)
+        val largada = CountDownLatch(1)
+
+        val tentativas =
+            (1..5).map {
+                pool.submit(
+                    Callable<Exception?> {
+                        largada.await()
+                        try {
+                            service.atualizarStatus(
+                                inscricao.id!!,
+                                AtualizarStatusRequest(status = CONFIRMADA),
+                            )
+                            null
+                        } catch (e: Exception) {
+                            e
+                        }
+                    }
+                )
+            }
+        largada.countDown()
+        val resultados = tentativas.map { it.get(30, TimeUnit.SECONDS) }
+        pool.shutdown()
+
+        // PENDENTE→CONFIRMADA só pode acontecer uma vez; as outras já encontram CONFIRMADA (409).
+        assertEquals(1, resultados.count { it == null }, "confirmações aceitas")
+        assertEquals(
+            4,
+            resultados.count { it is ConflictException },
+            "rejeitadas com 409; erros recebidos: $resultados",
+        )
+    }
+
+    @Test
     fun `consultas fora de transacao devolvem a resposta completa`() {
         val evento = novoEvento(vagas = 10)
         val participante = novoParticipante()
