@@ -68,12 +68,13 @@ class InscricaoService(
     ): Page<InscricaoResponse> =
         repository.buscar(eventoId, participanteId, status, pageable).map { it.toResponse() }
 
-    // Sem trava: confirmar ou cancelar nunca ocupa vaga nova (CANCELADA é final e reinscrever cria
-    // uma linha nova).
+    // Confirmar ou cancelar nunca ocupa vaga nova (CANCELADA é final e reinscrever cria uma linha
+    // nova), mas a transição precisa ser atômica: sem a trava, dois PATCH simultâneos leriam o mesmo
+    // status e o último a gravar venceria, permitindo até CANCELADA → CONFIRMADA.
     @Transactional
     fun atualizarStatus(id: Long, request: AtualizarStatusRequest): InscricaoResponse {
         val novoStatus = requireNotNull(request.status) { "O status é obrigatório" }
-        val inscricao = obter(id)
+        val inscricao = obterParaAtualizar(id)
 
         if (novoStatus !in TRANSICOES.getValue(inscricao.status)) {
             throw ConflictException("Transição de status inválida: ${inscricao.status} → $novoStatus")
@@ -85,6 +86,10 @@ class InscricaoService(
 
     private fun obter(id: Long): Inscricao =
         repository.findByIdOrNull(id) ?: throw ResourceNotFoundException("Inscrição $id não encontrada")
+
+    private fun obterParaAtualizar(id: Long): Inscricao =
+        repository.buscarParaAtualizar(id)
+            ?: throw ResourceNotFoundException("Inscrição $id não encontrada")
 
     private companion object {
         // Status que ocupam vaga. CANCELADA libera.
