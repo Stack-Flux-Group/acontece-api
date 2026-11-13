@@ -2,6 +2,10 @@
 
 API REST desenvolvida em kotlin para gerenciamento de eventos, inscrições e participantes da plataforma Acontece
 
+# Compilar o projeto
+
+.\mvnw compile
+
 # Rodar o projeto
 
 .\mvnw spring-boot:run
