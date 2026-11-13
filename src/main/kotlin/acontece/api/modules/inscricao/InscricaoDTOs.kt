@@ -11,6 +11,12 @@ data class InscricaoRequest(
     @field:NotNull(message = "O evento é obrigatório") val eventoId: Long? = null,
 )
 
+// Corpo do PATCH /inscricoes/{id}/status. Um status inexistente (ex.: "XYZ") vira 400 pelo handler
+// de JSON ilegível; um corpo sem status vira 400 com fieldErrors, pelo @NotNull.
+data class AtualizarStatusRequest(
+    @field:NotNull(message = "O status é obrigatório") val status: StatusInscricao? = null
+)
+
 data class InscricaoResponse(
     val id: Long,
     val participanteId: Long,
