@@ -13,18 +13,22 @@ import acontece.api.modules.evento.EventoRepository
 import acontece.api.modules.usuario.Participante
 import acontece.api.modules.usuario.ParticipanteRepository
 import jakarta.persistence.EntityManager
+import jakarta.persistence.EntityManagerFactory
 import java.time.LocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
+import org.hibernate.SessionFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
 
 // @DataJpaTest + @Import: banco H2 em memória com o service real (nada de mock, nada de Supabase).
-@DataJpaTest
+// generate_statistics permite contar quantas consultas SQL o Hibernate executou.
+@DataJpaTest(properties = ["spring.jpa.properties.hibernate.generate_statistics=true"])
 @Import(InscricaoService::class, ClockConfig::class)
 class InscricaoServiceTest {
 
@@ -33,6 +37,7 @@ class InscricaoServiceTest {
     @Autowired lateinit var eventos: EventoRepository
     @Autowired lateinit var participantes: ParticipanteRepository
     @Autowired lateinit var em: EntityManager
+    @Autowired lateinit var entityManagerFactory: EntityManagerFactory
 
     private var contador = 0
 
@@ -279,6 +284,25 @@ class InscricaoServiceTest {
             assertEquals("Transição de status inválida: $origem → $destino", erro.message)
             assertEquals(origem, statusNoBanco(inscricao.id!!), "banco de $origem → $destino")
         }
+    }
+
+    @Test
+    fun `listar nao faz uma consulta por linha`() {
+        repeat(5) { inscrever(novoParticipante(), novoEvento(), PENDENTE) }
+        em.flush()
+        em.clear() // descarta o cache: tudo abaixo precisa vir do banco
+        val estatisticas = entityManagerFactory.unwrap(SessionFactory::class.java).statistics
+        estatisticas.clear()
+
+        val pagina = service.listar(null, null, null, PageRequest.of(0, 10))
+
+        assertEquals(5, pagina.content.size)
+        // Uma única consulta traz inscrições, participantes e eventos juntos. Sem isso seriam
+        // 1 + 5 (participantes) + 5 (eventos) idas ao banco, que no Supabase é remoto.
+        assertTrue(
+            estatisticas.prepareStatementCount <= 2,
+            "consultas executadas: ${estatisticas.prepareStatementCount}",
+        )
     }
 
     @Test
