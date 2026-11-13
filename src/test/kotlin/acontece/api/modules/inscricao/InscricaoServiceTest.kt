@@ -1,5 +1,6 @@
 package acontece.api.modules.inscricao
 
+import acontece.api.config.ClockConfig
 import acontece.api.enums.StatusInscricao
 import acontece.api.enums.StatusInscricao.CANCELADA
 import acontece.api.enums.StatusInscricao.CONFIRMADA
@@ -24,7 +25,7 @@ import org.springframework.data.domain.PageRequest
 
 // @DataJpaTest + @Import: banco H2 em memória com o service real (nada de mock, nada de Supabase).
 @DataJpaTest
-@Import(InscricaoService::class)
+@Import(InscricaoService::class, ClockConfig::class)
 class InscricaoServiceTest {
 
     @Autowired lateinit var service: InscricaoService
