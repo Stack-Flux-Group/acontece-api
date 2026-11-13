@@ -23,14 +23,14 @@ class GlobalExceptionHandler {
     fun handleNotFound(
         ex: ResourceNotFoundException,
         request: HttpServletRequest,
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> =
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         build(HttpStatus.NOT_FOUND, ex.message ?: "Recurso não encontrado", request)
 
     @ExceptionHandler(ConflictException::class)
     fun handleConflict(
         ex: ConflictException,
         request: HttpServletRequest,
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> =
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         build(HttpStatus.CONFLICT, ex.message ?: "Conflito de dados", request)
 
     // 400 - regras de negócio (CEP inválido, data fim antes do início...)
@@ -38,14 +38,14 @@ class GlobalExceptionHandler {
     fun handleBusinessRule(
         ex: IllegalArgumentException,
         request: HttpServletRequest,
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> =
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         build(HttpStatus.BAD_REQUEST, ex.message ?: "Requisição inválida", request)
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidation(
         ex: MethodArgumentNotValidException,
         request: HttpServletRequest,
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> {
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> {
         val violations =
             ex.bindingResult.fieldErrors.map {
                 FieldViolation(field = it.field, message = it.defaultMessage ?: "Valor inválido")
@@ -57,21 +57,21 @@ class GlobalExceptionHandler {
     fun handleUnreadable(
         ex: HttpMessageNotReadableException,
         request: HttpServletRequest,
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> =
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         build(HttpStatus.BAD_REQUEST, "Corpo de requisição ausente ou JSON malformado", request)
 
     @ExceptionHandler(MethodArgumentTypeMismatchException::class)
     fun handleTypeMismatch(
         ex: MethodArgumentTypeMismatchException,
         request: HttpServletRequest,
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> =
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         build(HttpStatus.BAD_REQUEST, "Parametro '${ex.name}' com valor inválido", request)
 
     @ExceptionHandler(DataIntegrityViolationException::class)
     fun handleIntegrity(
         ex: DataIntegrityViolationException,
         request: HttpServletRequest,
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> {
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> {
         log.warn(
             "Violação de integridade em {}: {}",
             request.requestURI,
@@ -88,7 +88,7 @@ class GlobalExceptionHandler {
     fun handleUnexpected(
         ex: Exception,
         request: HttpServletRequest,
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> {
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> {
         if (ex is ErrorResponse) {
             val status = HttpStatus.valueOf(ex.statusCode.value())
             return build(status, ex.body.detail ?: status.reasonPhrase, request)
@@ -102,10 +102,10 @@ class GlobalExceptionHandler {
         message: String,
         request: HttpServletRequest,
         violations: List<FieldViolation> = emptyList(),
-    ): ResponseEntity<acontece.api.exception.ErrorResponse> =
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         ResponseEntity.status(status)
             .body(
-                ErrorResponse(
+                ApiErrorResponse(
                     status = status.value(),
                     error = status.reasonPhrase,
                     message = message,
