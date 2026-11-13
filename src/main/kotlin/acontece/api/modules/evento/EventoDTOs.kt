@@ -27,6 +27,7 @@ data class EventoRequestDTO(
     // Aceita "01001000" ou "01001-000"
     @field:Pattern(regexp = "\\d{5}-?\\d{3}", message = "CEP deve ter 8 dígitos") val cep: String,
     val numero: String? = null,
+    val fotoUrl: String? = null,
 )
 
 // O que a API devolver
@@ -38,6 +39,7 @@ data class EventoResponseDTO(
     val dataFim: LocalDateTime,
     val vagas: Int,
     val endereco: Endereco,
+    val fotoUrl: String?,
 )
 
 // Função de extensão: permite escrever evento.toResponse()
@@ -51,4 +53,5 @@ fun Evento.toResponse() =
         dataFim = dataFim,
         vagas = vagas,
         endereco = endereco,
+        fotoUrl = fotoUrl,
     )

@@ -44,6 +44,7 @@ class EventoService(
                 dataFim = dto.dataFim,
                 vagas = dto.vagas,
                 endereco = buscarEndereco(dto.cep, dto.numero),
+                fotoUrl = dto.fotoUrl,
             )
         return repository.save(evento).toResponse()
     }
@@ -58,6 +59,8 @@ class EventoService(
         evento.dataFim = dto.dataFim
         evento.vagas = dto.vagas
         evento.endereco = buscarEndereco(dto.cep, dto.numero)
+        evento.fotoUrl = dto.fotoUrl
+
         return repository.save(evento).toResponse()
     }
 

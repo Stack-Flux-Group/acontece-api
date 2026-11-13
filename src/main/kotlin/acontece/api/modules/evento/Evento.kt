@@ -11,7 +11,8 @@ class Evento(
     @Column(nullable = false) var dataInicio: LocalDateTime,
     @Column(nullable = false) var dataFim: LocalDateTime,
     @Column(nullable = false) var vagas: Int,
-    @Embedded var endereco: Endereco,
+    @Embedded @Column(nullable = false) var endereco: Endereco,
+    var fotoUrl: String? = null,
 
     // @Id @GeneratedValue(IDENTITY) faz o banco gerar o id. Ele é val e null ao criar, porque você
     // nunca altera o id depois.
