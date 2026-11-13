@@ -5,6 +5,7 @@ import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
 import acontece.api.modules.evento.EventoRepository
 import acontece.api.modules.usuario.ParticipanteRepository
+import java.time.Clock
 import java.time.LocalDateTime
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -17,6 +18,7 @@ class InscricaoService(
     private val repository: InscricaoRepository,
     private val eventoRepository: EventoRepository,
     private val participanteRepository: ParticipanteRepository,
+    private val clock: Clock,
 ) {
 
     @Transactional
@@ -35,7 +37,9 @@ class InscricaoService(
             eventoRepository.buscarParaInscricao(eventoId)
                 ?: throw ResourceNotFoundException("Evento $eventoId não encontrado")
 
-        require(evento.dataFim.isAfter(LocalDateTime.now())) { "O evento já foi encerrado" }
+        // "Agora" vem do Clock (horário de São Paulo), o mesmo fuso em que o evento foi cadastrado.
+        val agora = LocalDateTime.now(clock)
+        require(evento.dataFim.isAfter(agora)) { "O evento já foi encerrado" }
 
         if (
             repository.existsByParticipanteIdAndEventoIdAndStatusIn(
@@ -51,7 +55,9 @@ class InscricaoService(
             throw ConflictException("Evento sem vagas disponíveis")
         }
 
-        return repository.save(Inscricao(participante = participante, evento = evento)).toResponse()
+        return repository
+            .save(Inscricao(participante = participante, evento = evento, dataInscricao = agora))
+            .toResponse()
     }
 
     @Transactional(readOnly = true)
