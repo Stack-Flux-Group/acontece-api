@@ -1,5 +1,8 @@
 package acontece.api.modules.usuario
 
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
+import io.swagger.v3.oas.annotations.security.SecurityRequirements
 import jakarta.validation.Valid
 import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PagedModel
@@ -17,12 +20,18 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 
+@Tag(name = "Participantes", description = "Cadastro e dados dos participantes")
 @RestController
 @RequestMapping("/participantes")
 class ParticipanteController(
     private val service: ParticipanteService
 ) {
 
+    @Operation(
+        summary = "Cadastrar participante",
+        description = "Rota pública. A senha deve ter de 8 a 72 caracteres.",
+    )
+    @SecurityRequirements
     @PostMapping
     fun criar(@Valid @RequestBody request: ParticipanteRequest):
             ResponseEntity<ParticipanteResponse> {
@@ -34,16 +43,19 @@ class ParticipanteController(
         return ResponseEntity.created(location).body(criado)
     }
 
+    @Operation(summary = "Listar participantes", description = "Somente organizador.")
     @GetMapping
     fun listar(pageable: Pageable): PagedModel<ParticipanteResponse> =
         PagedModel(service.listar(pageable))
 
     // Participante só mexe no próprio cadastro; o organizador mexe em qualquer um.
     // `authentication.name` é o id do usuário (subject do token).
+    @Operation(summary = "Buscar participante", description = "O próprio participante ou um organizador.")
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ORGANIZADOR') or #id.toString() == authentication.name")
     fun buscarPorId(@PathVariable id: Long): ParticipanteResponse = service.buscarPorId(id)
 
+    @Operation(summary = "Atualizar participante", description = "O próprio participante ou um organizador. Só os campos enviados mudam.")
     @PatchMapping("/{id}")
     @PreAuthorize("hasRole('ORGANIZADOR') or #id.toString() == authentication.name")
     fun atualizar(
@@ -51,6 +63,7 @@ class ParticipanteController(
         @Valid @RequestBody request: ParticipantePatchRequest
     ): ParticipanteResponse = service.atualizar(id, request)
 
+    @Operation(summary = "Excluir participante", description = "O próprio participante ou um organizador.")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ORGANIZADOR') or #id.toString() == authentication.name")
     @ResponseStatus(HttpStatus.NO_CONTENT)
