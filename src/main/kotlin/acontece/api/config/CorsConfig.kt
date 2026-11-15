@@ -6,10 +6,10 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
 // Libera o front-end (outra origem) a chamar a API. As origens vêm de `cors.allowed-origins`
-// (separadas por vírgula); o padrão já inclui o front na Vercel e o ambiente local.
+// (separadas por vírgula); o padrão já inclui o front na Netlify e o ambiente local.
 @Configuration
 class CorsConfig(
-    @Value("\${cors.allowed-origins:http://localhost:3000,http://localhost:5173,https://acontece-frontend.vercel.app}")
+    @Value("\${cors.allowed-origins:http://localhost:3000,http://localhost:5173,https://acontece.netlify.app}")
     private val origensPermitidas: List<String>,
 ) : WebMvcConfigurer {
 
