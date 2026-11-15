@@ -1,5 +1,7 @@
 package acontece.api.modules.inscricao
 
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.tags.Tag
 import acontece.api.config.ehOrganizador
 import acontece.api.config.usuarioId
 import acontece.api.enums.StatusInscricao
@@ -21,12 +23,17 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 
+@Tag(name = "Inscrições", description = "Inscrição de participantes em eventos")
 @RestController
 @RequestMapping("/inscricoes")
 class InscricaoController(
     private val service: InscricaoService
 ) {
 
+    @Operation(
+        summary = "Inscrever-se em um evento",
+        description = "Somente participante. A inscrição é sempre em nome de quem está logado; só o `eventoId` é enviado.",
+    )
     // Só participante se inscreve (regra na SecurityConfig), sempre em seu próprio nome.
     @PostMapping
     fun criar(
@@ -42,7 +49,10 @@ class InscricaoController(
         return ResponseEntity.created(location).body(criada)
     }
 
-    // Participante só enxerga as próprias inscrições; o organizador enxerga todas.
+    @Operation(
+        summary = "Buscar inscrição",
+        description = "O participante só vê as próprias; o organizador vê todas.",
+    )
     @GetMapping("/{id}")
     fun buscarPorId(@PathVariable id: Long, @AuthenticationPrincipal jwt: Jwt): InscricaoResponse {
         val inscricao = service.buscarPorId(id)
@@ -52,6 +62,10 @@ class InscricaoController(
         return inscricao
     }
 
+    @Operation(
+        summary = "Listar inscrições",
+        description = "O participante recebe só as próprias (o filtro `participanteId` é ignorado); o organizador pode filtrar por evento, participante e status.",
+    )
     @GetMapping
     fun listar(
         @RequestParam(required = false) eventoId: Long?,
@@ -65,6 +79,10 @@ class InscricaoController(
         return PagedModel(service.listar(eventoId, doParticipante, status, pageable))
     }
 
+    @Operation(
+        summary = "Alterar status da inscrição",
+        description = "Somente organizador. Transições: PENDENTE → CONFIRMADA ou CANCELADA; CONFIRMADA → CANCELADA.",
+    )
     @PatchMapping("/{id}/status")
     fun atualizarStatus(
         @PathVariable id: Long,
