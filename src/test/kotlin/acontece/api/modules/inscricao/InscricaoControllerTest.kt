@@ -1,5 +1,8 @@
 package acontece.api.modules.inscricao
 
+import acontece.api.comoOrganizador
+import acontece.api.comoParticipante
+import acontece.api.config.SecurityConfig
 import acontece.api.enums.StatusInscricao.CONFIRMADA
 import acontece.api.enums.StatusInscricao.PENDENTE
 import acontece.api.exception.ConflictException
@@ -12,6 +15,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.mockito.BDDMockito.never
+import org.mockito.BDDMockito.then
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
@@ -25,11 +32,15 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 // @WebMvcTest sobe só a camada web (controller + GlobalExceptionHandler), sem banco de dados.
 // O service é um mock: aqui testamos rotas, status HTTP e o formato das respostas.
 @WebMvcTest(InscricaoController::class)
+@Import(SecurityConfig::class)
 class InscricaoControllerTest {
 
     @Autowired lateinit var mockMvc: MockMvc
 
     @MockitoBean lateinit var service: InscricaoService
+
+    // A SecurityConfig exige um decoder; aqui o token já vem autenticado, então ele nunca é usado.
+    @MockitoBean lateinit var jwtDecoder: JwtDecoder
 
     private val inscricao =
         InscricaoResponse(
@@ -49,8 +60,9 @@ class InscricaoControllerTest {
         mockMvc
             .perform(
                 post("/inscricoes")
+                    .with(comoParticipante(1))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"participanteId": 1, "eventoId": 2}""")
+                    .content("""{"eventoId": 2}""")
             )
             .andExpect(status().isCreated)
             .andExpect(header().string("Location", "http://localhost/inscricoes/10"))
@@ -59,13 +71,55 @@ class InscricaoControllerTest {
     }
 
     @Test
-    fun `POST sem participanteId devolve 400 com fieldErrors`() {
+    fun `POST sem eventoId devolve 400 com fieldErrors`() {
         mockMvc
             .perform(
-                post("/inscricoes").contentType(MediaType.APPLICATION_JSON).content("""{"eventoId": 2}""")
+                post("/inscricoes")
+                    .with(comoParticipante(1))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
             )
             .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("\$.fieldErrors[0].field").value("participanteId"))
+            .andExpect(jsonPath("\$.fieldErrors[0].field").value("eventoId"))
+    }
+
+    @Test
+    fun `POST ignora o participanteId do corpo e usa o do token`() {
+        given(service.criar(InscricaoRequest(participanteId = 1, eventoId = 2))).willReturn(inscricao)
+
+        mockMvc
+            .perform(
+                post("/inscricoes")
+                    .with(comoParticipante(1))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"participanteId": 999, "eventoId": 2}""")
+            )
+            .andExpect(status().isCreated)
+
+        then(service).should(never()).criar(InscricaoRequest(participanteId = 999, eventoId = 2))
+    }
+
+    @Test
+    fun `POST sem token devolve 401`() {
+        mockMvc
+            .perform(
+                post("/inscricoes")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"eventoId": 2}""")
+            )
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `POST como organizador devolve 403`() {
+        mockMvc
+            .perform(
+                post("/inscricoes")
+                    .with(comoOrganizador())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"eventoId": 2}""")
+            )
+            .andExpect(status().isForbidden)
     }
 
     @Test
@@ -76,8 +130,9 @@ class InscricaoControllerTest {
         mockMvc
             .perform(
                 post("/inscricoes")
+                    .with(comoParticipante(999))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"participanteId": 999, "eventoId": 2}""")
+                    .content("""{"eventoId": 2}""")
             )
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("\$.message").value("Participante 999 não encontrado"))
@@ -91,8 +146,9 @@ class InscricaoControllerTest {
         mockMvc
             .perform(
                 post("/inscricoes")
+                    .with(comoParticipante(1))
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"participanteId": 1, "eventoId": 2}""")
+                    .content("""{"eventoId": 2}""")
             )
             .andExpect(status().isConflict)
             .andExpect(jsonPath("\$.message").value("Evento sem vagas disponíveis"))
@@ -103,10 +159,33 @@ class InscricaoControllerTest {
         given(service.buscarPorId(10L)).willReturn(inscricao)
 
         mockMvc
-            .perform(get("/inscricoes/10"))
+            .perform(get("/inscricoes/10").with(comoParticipante(1)))
             .andExpect(status().isOk)
             .andExpect(jsonPath("\$.participanteNome").value("Maria Silva"))
             .andExpect(jsonPath("\$.eventoTitulo").value("Show de Jazz"))
+    }
+
+    @Test
+    fun `GET por id de inscricao de outro participante devolve 403`() {
+        given(service.buscarPorId(10L)).willReturn(inscricao)
+
+        mockMvc
+            .perform(get("/inscricoes/10").with(comoParticipante(2)))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `GET por id como organizador devolve 200`() {
+        given(service.buscarPorId(10L)).willReturn(inscricao)
+
+        mockMvc
+            .perform(get("/inscricoes/10").with(comoOrganizador()))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `GET sem token devolve 401`() {
+        mockMvc.perform(get("/inscricoes/10")).andExpect(status().isUnauthorized)
     }
 
     @Test
@@ -115,7 +194,7 @@ class InscricaoControllerTest {
             .willThrow(ResourceNotFoundException("Inscrição 99 não encontrada"))
 
         mockMvc
-            .perform(get("/inscricoes/99"))
+            .perform(get("/inscricoes/99").with(comoOrganizador()))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("\$.message").value("Inscrição 99 não encontrada"))
     }
@@ -127,15 +206,34 @@ class InscricaoControllerTest {
             .willReturn(PageImpl(listOf(inscricao.copy(status = CONFIRMADA)), pageable, 1))
 
         mockMvc
-            .perform(get("/inscricoes").param("eventoId", "2").param("status", "CONFIRMADA"))
+            .perform(
+                get("/inscricoes")
+                    .with(comoOrganizador())
+                    .param("eventoId", "2")
+                    .param("status", "CONFIRMADA")
+            )
             .andExpect(status().isOk)
             .andExpect(jsonPath("\$.content[0].id").value(10))
             .andExpect(jsonPath("\$.content[0].status").value("CONFIRMADA"))
     }
 
     @Test
+    fun `GET lista como participante filtra pelo proprio id mesmo se pedir outro`() {
+        val pageable = PageRequest.of(0, 20, Sort.by("id"))
+        given(service.listar(null, 1L, null, pageable))
+            .willReturn(PageImpl(listOf(inscricao), pageable, 1))
+
+        mockMvc
+            .perform(get("/inscricoes").with(comoParticipante(1)).param("participanteId", "2"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("\$.content[0].participanteId").value(1))
+    }
+
+    @Test
     fun `GET lista com status invalido devolve 400`() {
-        mockMvc.perform(get("/inscricoes").param("status", "XYZ")).andExpect(status().isBadRequest)
+        mockMvc
+            .perform(get("/inscricoes").with(comoOrganizador()).param("status", "XYZ"))
+            .andExpect(status().isBadRequest)
     }
 
     @Test
@@ -146,6 +244,7 @@ class InscricaoControllerTest {
         mockMvc
             .perform(
                 patch("/inscricoes/10/status")
+                    .with(comoOrganizador())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"status": "CONFIRMADA"}""")
             )
@@ -158,6 +257,7 @@ class InscricaoControllerTest {
         mockMvc
             .perform(
                 patch("/inscricoes/10/status")
+                    .with(comoOrganizador())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"status": "XYZ"}""")
             )
@@ -168,7 +268,10 @@ class InscricaoControllerTest {
     fun `PATCH sem status devolve 400 com fieldErrors`() {
         mockMvc
             .perform(
-                patch("/inscricoes/10/status").contentType(MediaType.APPLICATION_JSON).content("{}")
+                patch("/inscricoes/10/status")
+                    .with(comoOrganizador())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
             )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("\$.fieldErrors[0].field").value("status"))
@@ -182,9 +285,22 @@ class InscricaoControllerTest {
         mockMvc
             .perform(
                 patch("/inscricoes/10/status")
+                    .with(comoOrganizador())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"status": "PENDENTE"}""")
             )
             .andExpect(status().isConflict)
+    }
+
+    @Test
+    fun `PATCH status como participante devolve 403`() {
+        mockMvc
+            .perform(
+                patch("/inscricoes/10/status")
+                    .with(comoParticipante(1))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"status": "CANCELADA"}""")
+            )
+            .andExpect(status().isForbidden)
     }
 }

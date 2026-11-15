@@ -21,7 +21,12 @@ data class ParticipanteRequest(
     val cpf: String = "",
 
     @field:Pattern(regexp = """^\d{10,11}$""", message = "O telefone deve ter 10 ou 11 digitos, somente numeros")
-    val telefone: String? = null
+    val telefone: String? = null,
+
+    // BCrypt só lê os primeiros 72 bytes, por isso o teto.
+    @field:NotBlank(message = "A senha é obrigatória")
+    @field:Size(min = 8, max = 72, message = "A senha deve ter entre 8 e 72 caracteres")
+    val senha: String = "",
 ) {
     fun normalizado() = copy(
         nome = nome.trim(),
@@ -29,11 +34,13 @@ data class ParticipanteRequest(
         cpf = cpf.filter(Char::isDigit)
     )
 
-    fun toEntity(): Participante = Participante(
+    // Recebe o hash já pronto: quem chama é que sabe qual PasswordEncoder usar.
+    fun toEntity(senhaHash: String): Participante = Participante(
         nome = nome,
         email = email,
         cpf = cpf,
-        telefone = telefone
+        telefone = telefone,
+        senha = senhaHash
     )
 }
 

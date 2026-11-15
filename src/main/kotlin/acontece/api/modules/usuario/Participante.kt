@@ -1,5 +1,6 @@
 package acontece.api.modules.usuario
 
+import acontece.api.enums.Papel
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 
@@ -11,6 +12,12 @@ class Participante(
     @Column(nullable = false, unique = true, length = 11)
     var cpf: String,
 
-    var telefone: String? = null
+    var telefone: String? = null,
 
-) : Usuario(nome, email)
+    senha: String? = null,
+
+) : Usuario(nome, email, senha) {
+
+    override val papel: Papel
+        get() = Papel.PARTICIPANTE
+}
