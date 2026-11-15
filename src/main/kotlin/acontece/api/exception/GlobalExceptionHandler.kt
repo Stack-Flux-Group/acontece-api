@@ -6,6 +6,8 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.security.access.AccessDeniedException
+import org.springframework.security.authentication.BadCredentialsException
 import org.springframework.web.ErrorResponse
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -83,6 +85,23 @@ class GlobalExceptionHandler {
             request,
         )
     }
+
+    // 401 - login com e-mail ou senha errados
+    @ExceptionHandler(BadCredentialsException::class)
+    fun handleBadCredentials(
+        ex: BadCredentialsException,
+        request: HttpServletRequest,
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
+        build(HttpStatus.UNAUTHORIZED, ex.message ?: "Credenciais inválidas", request)
+
+    // 403 - logado, mas sem permissão (@PreAuthorize ou checagem de dono). Sem este handler, o
+    // handler genérico abaixo o transformaria em 500.
+    @ExceptionHandler(AccessDeniedException::class)
+    fun handleAccessDenied(
+        ex: AccessDeniedException,
+        request: HttpServletRequest,
+    ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
+        build(HttpStatus.FORBIDDEN, "Você não tem permissão para esta operação", request)
 
     @ExceptionHandler(Exception::class)
     fun handleUnexpected(

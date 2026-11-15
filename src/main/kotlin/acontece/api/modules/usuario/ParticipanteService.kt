@@ -5,12 +5,14 @@ import acontece.api.exception.ResourceNotFoundException
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Page
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
 class ParticipanteService(
-    private val repository: ParticipanteRepository
+    private val repository: ParticipanteRepository,
+    private val passwordEncoder: PasswordEncoder,
 ) {
     
     @Transactional
@@ -25,7 +27,7 @@ class ParticipanteService(
             throw ConflictException("Já existe um participante com esse Email")
         }
 
-        return repository.save(dados.toEntity()).toResponse()
+        return repository.save(dados.toEntity(passwordEncoder.encode(dados.senha)!!)).toResponse()
     }
 
     @Transactional(readOnly = true)

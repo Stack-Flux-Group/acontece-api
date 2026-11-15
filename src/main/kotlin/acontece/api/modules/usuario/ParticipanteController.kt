@@ -5,6 +5,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.web.PagedModel
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
@@ -37,16 +38,21 @@ class ParticipanteController(
     fun listar(pageable: Pageable): PagedModel<ParticipanteResponse> =
         PagedModel(service.listar(pageable))
 
+    // Participante só mexe no próprio cadastro; o organizador mexe em qualquer um.
+    // `authentication.name` é o id do usuário (subject do token).
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ORGANIZADOR') or #id.toString() == authentication.name")
     fun buscarPorId(@PathVariable id: Long): ParticipanteResponse = service.buscarPorId(id)
 
     @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('ORGANIZADOR') or #id.toString() == authentication.name")
     fun atualizar(
         @PathVariable id: Long,
         @Valid @RequestBody request: ParticipantePatchRequest
     ): ParticipanteResponse = service.atualizar(id, request)
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ORGANIZADOR') or #id.toString() == authentication.name")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun excluir(@PathVariable id: Long) = service.excluir(id)
 }
