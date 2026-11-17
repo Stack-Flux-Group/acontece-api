@@ -2,7 +2,10 @@ package acontece.api.modules.evento
 
 import acontece.api.comoOrganizador
 import acontece.api.config.SecurityConfig
+import acontece.api.exception.ServicoExternoException
+import java.time.LocalDateTime
 import kotlin.test.Test
+import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
@@ -40,11 +43,32 @@ class EventoValidacaoTest {
          "vagas":10,"cep":"01001-000","fotoUrl":"$fotoUrl"}
         """
 
+    // O mesmo pedido que corpo() descreve, já convertido em objeto.
+    private val pedidoDoCorpo =
+        EventoRequestDTO(
+            titulo = "Semana de Tecnologia",
+            descricao = "",
+            dataInicio = LocalDateTime.of(2030, 12, 1, 19, 0),
+            dataFim = LocalDateTime.of(2030, 12, 1, 22, 0),
+            vagas = 10,
+            cep = "01001-000",
+            fotoUrl = "https://cdn.exemplo.com/foto.png",
+        )
+
     @Test
     fun `descricao acima de 2000 caracteres devolve 400 no campo`() {
         criar(corpo(descricao = "a".repeat(2001)))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("\$.fieldErrors[0].field").value("descricao"))
+    }
+
+    @Test
+    fun `ViaCEP fora do ar devolve 502`() {
+        given(service.criar(pedidoDoCorpo)).willThrow(ServicoExternoException("Não foi possível consultar o CEP agora. Tente novamente."))
+
+        criar(corpo())
+            .andExpect(status().isBadGateway)
+            .andExpect(jsonPath("\$.message").value("Não foi possível consultar o CEP agora. Tente novamente."))
     }
 
     @Test

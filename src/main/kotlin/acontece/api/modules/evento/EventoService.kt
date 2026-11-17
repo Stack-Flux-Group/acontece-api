@@ -2,15 +2,20 @@ package acontece.api.modules.evento
 
 import acontece.api.client.ViaCepClient
 import acontece.api.exception.ResourceNotFoundException
+import acontece.api.exception.ServicoExternoException
+import feign.FeignException
 import java.time.LocalDateTime
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 
 @Service
 class EventoService(
     private val repository: EventoRepository,
     private val viaCepClient: ViaCepClient,
+    // Abre uma transação só no trecho que precisa dela (ver atualizar).
+    private val transacao: TransactionTemplate,
 ) {
 
     // Leitura
@@ -31,11 +36,12 @@ class EventoService(
     }
 
     // Escrita
-    // @Transactional: se algo falhar no meio, nada é gravado no banco
+    // criar e atualizar NÃO são @Transactional: o ViaCEP é consultado antes de abrir a transação,
+    // para não segurar uma conexão do banco (o pool tem só 3) enquanto espera a internet.
 
-    @Transactional
     fun criar(dto: EventoRequestDTO): EventoResponseDTO {
         validarDatas(dto)
+        val endereco = buscarEndereco(dto.cep, dto.numero)
         val evento =
             Evento(
                 titulo = dto.titulo,
@@ -43,25 +49,30 @@ class EventoService(
                 dataInicio = dto.dataInicio,
                 dataFim = dto.dataFim,
                 vagas = dto.vagas,
-                endereco = buscarEndereco(dto.cep, dto.numero),
+                endereco = endereco,
                 fotoUrl = dto.fotoUrl,
             )
-        return repository.save(evento).toResponse()
+        return repository.save(evento).toResponse() // o save abre e fecha a própria transação
     }
 
-    @Transactional
     fun atualizar(id: Long, dto: EventoRequestDTO): EventoResponseDTO {
         validarDatas(dto)
-        val evento = buscarEntidade(id) // 404 se não existir
-        evento.titulo = dto.titulo
-        evento.descricao = dto.descricao
-        evento.dataInicio = dto.dataInicio
-        evento.dataFim = dto.dataFim
-        evento.vagas = dto.vagas
-        evento.endereco = buscarEndereco(dto.cep, dto.numero)
-        evento.fotoUrl = dto.fotoUrl
+        val endereco = buscarEndereco(dto.cep, dto.numero)
 
-        return repository.save(evento).toResponse()
+        // Daqui para baixo é uma transação só: se algo falhar no meio, nada é gravado.
+        val atualizado =
+            transacao.execute {
+                val evento = buscarEntidade(id) // 404 se não existir
+                evento.titulo = dto.titulo
+                evento.descricao = dto.descricao
+                evento.dataInicio = dto.dataInicio
+                evento.dataFim = dto.dataFim
+                evento.vagas = dto.vagas
+                evento.endereco = endereco
+                evento.fotoUrl = dto.fotoUrl
+                evento.toResponse() // o JPA grava as mudanças sozinho ao fim da transação
+            }
+        return checkNotNull(atualizado)
     }
 
     @Transactional fun deletar(id: Long) = repository.delete(buscarEntidade(id))
@@ -82,7 +93,13 @@ class EventoService(
     // Chama ViaCEP e transforma a resposta no Endereco da entidade
     private fun buscarEndereco(cep: String, numero: String?): Endereco {
         val cepLimpo = cep.replace("-", "") // ViaCEP espera só números
-        val resposta = viaCepClient.buscarCep(cepLimpo)
+        val resposta =
+            try {
+                viaCepClient.buscarCep(cepLimpo)
+            } catch (ex: FeignException) {
+                // Fora do ar, erro do lado deles ou passou do timeout -> 502
+                throw ServicoExternoException("Não foi possível consultar o CEP agora. Tente novamente.", ex)
+            }
 
         // CEP com formato certo, mas inexistente -> ViaCEP devolve {"erro": true}
         require(resposta.erro != true) { "CEP $cep não encontrado" }

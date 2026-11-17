@@ -2,17 +2,22 @@ package acontece.api.modules.evento
 
 import acontece.api.client.ViaCepClient
 import acontece.api.client.ViaCepResponseDTO
+import acontece.api.exception.ResourceNotFoundException
+import acontece.api.exception.ServicoExternoException
+import feign.FeignException
 import java.time.LocalDateTime
 import javax.sql.DataSource
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.transaction.support.TransactionSynchronizationManager
 
 // Sobe a aplicação inteira com um H2 em memória e o ViaCEP trocado por um mock (nada de internet).
 // Não é @Transactional de propósito: cada chamada ao service abre e fecha a própria transação,
@@ -73,6 +78,34 @@ class EventoServiceTest {
         val salvo = eventos.findById(criado.id).orElseThrow()
         assertEquals(descricao, salvo.descricao)
         assertEquals(fotoUrl, salvo.fotoUrl)
+    }
+
+    @Test
+    fun `consulta o ViaCEP fora de transacao ao criar e ao atualizar`() {
+        val emTransacao = mutableListOf<Boolean>()
+        given(viaCep.buscarCep(anyString())).willAnswer {
+            emTransacao += TransactionSynchronizationManager.isActualTransactionActive()
+            SE
+        }
+
+        val criado = service.criar(pedido())
+        service.atualizar(criado.id, pedido(descricao = "nova"))
+
+        assertEquals(listOf(false, false), emTransacao)
+        assertEquals("nova", eventos.findById(criado.id).orElseThrow().descricao)
+    }
+
+    @Test
+    fun `ViaCEP fora do ar vira ServicoExternoException e nada e gravado`() {
+        given(viaCep.buscarCep(anyString())).willThrow(FeignException::class.java)
+
+        assertFailsWith<ServicoExternoException> { service.criar(pedido()) }
+        assertEquals(0, eventos.count())
+    }
+
+    @Test
+    fun `atualizar evento inexistente devolve 404`() {
+        assertFailsWith<ResourceNotFoundException> { service.atualizar(999999L, pedido()) }
     }
 
     private companion object {

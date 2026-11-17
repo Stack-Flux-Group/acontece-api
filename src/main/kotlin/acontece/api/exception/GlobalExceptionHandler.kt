@@ -35,6 +35,16 @@ class GlobalExceptionHandler {
     ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         build(HttpStatus.CONFLICT, ex.message ?: "Conflito de dados", request)
 
+    // 502 - serviço externo (ViaCEP) fora do ar ou lento demais
+    @ExceptionHandler(ServicoExternoException::class)
+    fun handleServicoExterno(
+        ex: ServicoExternoException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> {
+        log.warn("Falha em serviço externo em {}: {}", request.requestURI, ex.cause?.message)
+        return build(HttpStatus.BAD_GATEWAY, ex.message ?: "Serviço externo indisponível", request)
+    }
+
     // 400 - regras de negócio (CEP inválido, data fim antes do início...)
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleBusinessRule(
