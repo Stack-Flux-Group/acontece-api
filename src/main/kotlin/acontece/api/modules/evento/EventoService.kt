@@ -1,8 +1,11 @@
 package acontece.api.modules.evento
 
 import acontece.api.client.ViaCepClient
+import acontece.api.enums.StatusInscricao
+import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
 import acontece.api.exception.ServicoExternoException
+import acontece.api.modules.inscricao.InscricaoRepository
 import feign.FeignException
 import java.time.LocalDateTime
 import org.springframework.data.repository.findByIdOrNull
@@ -14,6 +17,8 @@ import org.springframework.transaction.support.TransactionTemplate
 class EventoService(
     private val repository: EventoRepository,
     private val viaCepClient: ViaCepClient,
+    // Para contar as inscrições ativas antes de reduzir as vagas.
+    private val inscricaoRepository: InscricaoRepository,
     // Abre uma transação só no trecho que precisa dela (ver atualizar).
     private val transacao: TransactionTemplate,
 ) {
@@ -62,7 +67,20 @@ class EventoService(
         // Daqui para baixo é uma transação só: se algo falhar no meio, nada é gravado.
         val atualizado =
             transacao.execute {
-                val evento = buscarEntidade(id) // 404 se não existir
+                // Trava a linha do evento: uma inscrição que chegue agora espera esta edição
+                // terminar, então a contagem abaixo não fica velha antes de gravar.
+                val evento =
+                    repository.buscarComTrava(id)
+                        ?: throw ResourceNotFoundException("Evento com id $id não encontrado")
+
+                val ocupadas =
+                    inscricaoRepository.countByEventoIdAndStatusIn(id, StatusInscricao.QUE_OCUPAM_VAGA)
+                if (dto.vagas < ocupadas) {
+                    throw ConflictException(
+                        "O evento já tem $ocupadas inscrições ativas; as vagas não podem ficar abaixo disso"
+                    )
+                }
+
                 evento.titulo = dto.titulo
                 evento.descricao = dto.descricao
                 evento.dataInicio = inicio

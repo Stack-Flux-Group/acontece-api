@@ -2,7 +2,16 @@ package acontece.api.modules.evento
 
 import acontece.api.client.ViaCepClient
 import acontece.api.client.ViaCepResponseDTO
+import acontece.api.enums.StatusInscricao
+import acontece.api.enums.StatusInscricao.CANCELADA
+import acontece.api.enums.StatusInscricao.CONFIRMADA
+import acontece.api.enums.StatusInscricao.PENDENTE
+import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
+import acontece.api.modules.inscricao.Inscricao
+import acontece.api.modules.inscricao.InscricaoRepository
+import acontece.api.modules.usuario.Participante
+import acontece.api.modules.usuario.ParticipanteRepository
 import acontece.api.exception.ServicoExternoException
 import feign.FeignException
 import java.time.LocalDateTime
@@ -35,7 +44,11 @@ class EventoServiceTest {
 
     @Autowired lateinit var service: EventoService
     @Autowired lateinit var eventos: EventoRepository
+    @Autowired lateinit var inscricoes: InscricaoRepository
+    @Autowired lateinit var participantes: ParticipanteRepository
     @Autowired lateinit var dataSource: DataSource
+
+    private var contador = 0
 
     @MockitoBean lateinit var viaCep: ViaCepClient
 
@@ -46,10 +59,26 @@ class EventoServiceTest {
     }
 
     // O JUnit roda o @AfterTest mesmo quando o @BeforeTest falha, então a guarda se repete aqui.
+    // A ordem importa: inscrições referenciam participantes e eventos.
     @AfterTest
     fun limpar() {
         garantirQueEstaNoH2()
+        inscricoes.deleteAll()
+        participantes.deleteAll()
         eventos.deleteAll()
+    }
+
+    private fun inscrever(eventoId: Long, status: StatusInscricao) {
+        val participante =
+            participantes.save(
+                Participante(
+                    nome = "Participante ${++contador}",
+                    email = "participante$contador@email.com",
+                    cpf = contador.toString().padStart(11, '0'),
+                )
+            )
+        val evento = eventos.findById(eventoId).orElseThrow()
+        inscricoes.save(Inscricao(participante = participante, evento = evento, status = status))
     }
 
     private fun garantirQueEstaNoH2() {
@@ -57,13 +86,13 @@ class EventoServiceTest {
         check(url.startsWith("jdbc:h2:mem")) { "Teste abortado: não está no H2 em memória ($url)" }
     }
 
-    private fun pedido(descricao: String = "", fotoUrl: String? = null) =
+    private fun pedido(descricao: String = "", fotoUrl: String? = null, vagas: Int = 10) =
         EventoRequestDTO(
             titulo = "Semana de Tecnologia",
             descricao = descricao,
             dataInicio = LocalDateTime.now().plusDays(1),
             dataFim = LocalDateTime.now().plusDays(2),
-            vagas = 10,
+            vagas = vagas,
             cep = "01001-000",
             fotoUrl = fotoUrl,
         )
@@ -101,6 +130,24 @@ class EventoServiceTest {
 
         assertFailsWith<ServicoExternoException> { service.criar(pedido()) }
         assertEquals(0, eventos.count())
+    }
+
+    @Test
+    fun `nao reduz as vagas abaixo das inscricoes ativas`() {
+        val criado = service.criar(pedido(vagas = 5))
+        inscrever(criado.id, PENDENTE)
+        inscrever(criado.id, CONFIRMADA)
+        inscrever(criado.id, CANCELADA) // cancelada não ocupa vaga
+
+        val erro = assertFailsWith<ConflictException> { service.atualizar(criado.id, pedido(vagas = 1)) }
+        assertEquals(
+            "O evento já tem 2 inscrições ativas; as vagas não podem ficar abaixo disso",
+            erro.message,
+        )
+        assertEquals(5, eventos.findById(criado.id).orElseThrow().vagas)
+
+        // Igual ao número de ativas pode: o evento só fica lotado.
+        assertEquals(2, service.atualizar(criado.id, pedido(vagas = 2)).vagas)
     }
 
     @Test
