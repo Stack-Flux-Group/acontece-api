@@ -34,7 +34,7 @@ class InscricaoService(
         // Aqui a linha do evento fica travada até o fim da transação: as checagens abaixo (duplicada
         // e vagas) rodam uma inscrição de cada vez por evento, então ninguém passa do limite.
         val evento =
-            eventoRepository.buscarParaInscricao(eventoId)
+            eventoRepository.buscarComTrava(eventoId)
                 ?: throw ResourceNotFoundException("Evento $eventoId não encontrado")
 
         // "Agora" vem do Clock (horário de São Paulo), o mesmo fuso em que o evento foi cadastrado.
@@ -45,13 +45,13 @@ class InscricaoService(
             repository.existsByParticipanteIdAndEventoIdAndStatusIn(
                 participanteId,
                 eventoId,
-                STATUS_ATIVOS,
+                StatusInscricao.QUE_OCUPAM_VAGA,
             )
         ) {
             throw ConflictException("Participante já possui inscrição ativa neste evento")
         }
 
-        if (repository.countByEventoIdAndStatusIn(eventoId, STATUS_ATIVOS) >= evento.vagas) {
+        if (repository.countByEventoIdAndStatusIn(eventoId, StatusInscricao.QUE_OCUPAM_VAGA) >= evento.vagas) {
             throw ConflictException("Evento sem vagas disponíveis")
         }
 
@@ -98,9 +98,6 @@ class InscricaoService(
             ?: throw ResourceNotFoundException("Inscrição $id não encontrada")
 
     private companion object {
-        // Status que ocupam vaga. CANCELADA libera.
-        val STATUS_ATIVOS = listOf(StatusInscricao.PENDENTE, StatusInscricao.CONFIRMADA)
-
         // Para cada status atual, os status para os quais ele pode ir.
         val TRANSICOES =
             mapOf(

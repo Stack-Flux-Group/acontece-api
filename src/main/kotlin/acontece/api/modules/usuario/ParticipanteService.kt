@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class ParticipanteService(
     private val repository: ParticipanteRepository,
+    // O e-mail é único entre TODOS os usuários (participantes e organizadores), então a checagem
+    // olha a tabela de usuários, não só a de participantes.
+    private val usuarioRepository: UsuarioRepository,
     private val passwordEncoder: PasswordEncoder,
 ) {
     
@@ -23,8 +26,8 @@ class ParticipanteService(
             throw ConflictException("Já existe um participante com esse CPF")
         }
 
-        if (repository.existsByEmail(dados.email)) {
-            throw ConflictException("Já existe um participante com esse Email")
+        if (usuarioRepository.existsByEmail(dados.email)) {
+            throw ConflictException(EMAIL_EM_USO)
         }
 
         return repository.save(dados.toEntity(passwordEncoder.encode(dados.senha)!!)).toResponse()
@@ -46,8 +49,8 @@ class ParticipanteService(
             throw ConflictException("Já existe um participante com esse CPF")
         }
 
-        if (dados.email != null && repository.existsByEmailAndIdNot(dados.email, id)) {
-            throw ConflictException("Já existe um participante com esse Email")
+        if (dados.email != null && usuarioRepository.existsByEmailAndIdNot(dados.email, id)) {
+            throw ConflictException(EMAIL_EM_USO)
         }
 
         dados.nome?.let { participante.nome = it }
@@ -70,5 +73,8 @@ class ParticipanteService(
     private fun obter(id: Long): Participante =
         repository.findByIdOrNull(id)
             ?: throw ResourceNotFoundException("Participante $id não encontrado")
-    
+
+    private companion object {
+        const val EMAIL_EM_USO = "Já existe um cadastro com esse e-mail"
+    }
 }

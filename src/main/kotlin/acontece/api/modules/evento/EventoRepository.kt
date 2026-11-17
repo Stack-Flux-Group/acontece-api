@@ -31,9 +31,9 @@ interface EventoRepository : JpaRepository<Evento, Long> {
     ): List<Evento>
 
     // Busca o evento travando a linha no banco (SELECT ... FOR UPDATE) até o fim da transação.
-    // Quem se inscreve no mesmo evento ao mesmo tempo espera a sua vez, então a contagem de vagas
-    // nunca é lida por dois pedidos ao mesmo tempo. Só funciona dentro de uma @Transactional.
+    // Inscrições no mesmo evento e a edição das vagas esperam a sua vez, então a contagem de vagas
+    // nunca é lida por dois pedidos ao mesmo tempo. Só funciona dentro de uma transação.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Evento e WHERE e.id = :id")
-    fun buscarParaInscricao(@Param("id") id: Long): Evento?
+    fun buscarComTrava(@Param("id") id: Long): Evento?
 }

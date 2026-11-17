@@ -186,10 +186,10 @@ class InscricaoRepositoryTest {
     }
 
     @Test
-    fun `buscarParaInscricao devolve o evento ou null`() {
+    fun `buscarComTrava devolve o evento ou null`() {
         val evento = novoEvento()
 
-        assertEquals(evento.id, eventos.buscarParaInscricao(evento.id!!)?.id)
-        assertNull(eventos.buscarParaInscricao(999999L))
+        assertEquals(evento.id, eventos.buscarComTrava(evento.id!!)?.id)
+        assertNull(eventos.buscarComTrava(999999L))
     }
 }
