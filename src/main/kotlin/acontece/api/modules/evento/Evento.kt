@@ -7,12 +7,12 @@ import java.time.LocalDateTime
 @Entity
 class Evento(
     @Column(nullable = false) var titulo: String,
-    var descricao: String,
+    @Column(length = 2000) var descricao: String,
     @Column(nullable = false) var dataInicio: LocalDateTime,
     @Column(nullable = false) var dataFim: LocalDateTime,
     @Column(nullable = false) var vagas: Int,
     @Embedded var endereco: Endereco,
-    var fotoUrl: String? = null,
+    @Column(length = 1000) var fotoUrl: String? = null,
 
     // @Id @GeneratedValue(IDENTITY) faz o banco gerar o id. Ele é val e null ao criar, porque você
     // nunca altera o id depois.

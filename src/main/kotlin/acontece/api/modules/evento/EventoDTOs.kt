@@ -19,6 +19,7 @@ data class EventoRequestDTO(
     @field:NotBlank(message = "O título do evento é obrigatório")
     @field:Size(max = 100, message = "O título do evento deve ter no máximo 100 caracteres")
     val titulo: String,
+    @field:Size(max = 2000, message = "A descrição deve ter no máximo 2000 caracteres")
     val descricao: String = "",
     @field:NotNull(message = "A data de início é obrigatória") val dataInicio: LocalDateTime,
     @field:NotNull(message = "A data de fim é obrigatória") val dataFim: LocalDateTime,
@@ -27,6 +28,7 @@ data class EventoRequestDTO(
     // Aceita "01001000" ou "01001-000"
     @field:Pattern(regexp = "\\d{5}-?\\d{3}", message = "CEP deve ter 8 dígitos") val cep: String,
     val numero: String? = null,
+    @field:Size(max = 1000, message = "A URL da foto deve ter no máximo 1000 caracteres")
     val fotoUrl: String? = null,
 )
 
