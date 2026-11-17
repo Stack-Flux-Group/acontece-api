@@ -23,7 +23,9 @@ class EventoController(
     // @Valid dispara as validações do RequestDTO (@NotBlank, @Pattern...)
     // @RequestBody transforma o JSON enviado no objeto dto
     @Operation(summary = "Criar evento", description = "Somente organizador. O endereço é preenchido pelo CEP.")
-    @PostMapping("/criar") fun criar(@Valid @RequestBody dto: EventoRequestDTO) = service.criar(dto)
+    @PostMapping("/criar")
+    @ResponseStatus(HttpStatus.CREATED)
+    fun criar(@Valid @RequestBody dto: EventoRequestDTO) = service.criar(dto)
 
     // GET Listar todos os eventos
     @Operation(summary = "Listar eventos")

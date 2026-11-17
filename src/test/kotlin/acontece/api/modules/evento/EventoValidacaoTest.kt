@@ -56,11 +56,32 @@ class EventoValidacaoTest {
             fotoUrl = "https://cdn.exemplo.com/foto.png",
         )
 
+    private val criado =
+        EventoResponseDTO(
+            id = 1,
+            titulo = "Semana de Tecnologia",
+            descricao = "",
+            dataInicio = LocalDateTime.of(2030, 12, 1, 19, 0),
+            dataFim = LocalDateTime.of(2030, 12, 1, 22, 0),
+            vagas = 10,
+            endereco = Endereco("01001-000", "Praça da Sé", "Sé", "São Paulo", "SP"),
+            fotoUrl = "https://cdn.exemplo.com/foto.png",
+        )
+
     @Test
     fun `descricao acima de 2000 caracteres devolve 400 no campo`() {
         criar(corpo(descricao = "a".repeat(2001)))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("\$.fieldErrors[0].field").value("descricao"))
+    }
+
+    @Test
+    fun `criar evento devolve 201`() {
+        given(service.criar(pedidoDoCorpo)).willReturn(criado)
+
+        criar(corpo())
+            .andExpect(status().isCreated)
+            .andExpect(jsonPath("\$.id").value(1))
     }
 
     @Test
