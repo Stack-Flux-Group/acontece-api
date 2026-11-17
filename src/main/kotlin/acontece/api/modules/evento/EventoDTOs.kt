@@ -15,18 +15,20 @@ import java.time.LocalDateTime
 // Datas chegam no JSON neste formato: "2026-12-01T19:00:00"
 
 // O que o cliente envia (POST / PUT)
+// Todo campo tem valor padrão: se faltar no JSON, quem reclama é a validação (400 com o nome do
+// campo), e não o Jackson (400 genérico de "JSON malformado").
 data class EventoRequestDTO(
     @field:NotBlank(message = "O título do evento é obrigatório")
     @field:Size(max = 100, message = "O título do evento deve ter no máximo 100 caracteres")
-    val titulo: String,
+    val titulo: String = "",
     @field:Size(max = 2000, message = "A descrição deve ter no máximo 2000 caracteres")
     val descricao: String = "",
-    @field:NotNull(message = "A data de início é obrigatória") val dataInicio: LocalDateTime,
-    @field:NotNull(message = "A data de fim é obrigatória") val dataFim: LocalDateTime,
-    @field:Positive(message = "Vagas deve ser maior que zero") val vagas: Int,
+    @field:NotNull(message = "A data de início é obrigatória") val dataInicio: LocalDateTime? = null,
+    @field:NotNull(message = "A data de fim é obrigatória") val dataFim: LocalDateTime? = null,
+    @field:Positive(message = "Vagas deve ser maior que zero") val vagas: Int = 0,
 
-    // Aceita "01001000" ou "01001-000"
-    @field:Pattern(regexp = "\\d{5}-?\\d{3}", message = "CEP deve ter 8 dígitos") val cep: String,
+    // Aceita "01001000" ou "01001-000"; vazio também cai aqui
+    @field:Pattern(regexp = "\\d{5}-?\\d{3}", message = "CEP deve ter 8 dígitos") val cep: String = "",
     val numero: String? = null,
     @field:Size(max = 1000, message = "A URL da foto deve ter no máximo 1000 caracteres")
     val fotoUrl: String? = null,

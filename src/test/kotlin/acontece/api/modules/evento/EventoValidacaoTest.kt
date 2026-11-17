@@ -5,6 +5,7 @@ import acontece.api.config.SecurityConfig
 import acontece.api.exception.ServicoExternoException
 import java.time.LocalDateTime
 import kotlin.test.Test
+import org.hamcrest.Matchers.containsInAnyOrder
 import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
@@ -60,6 +61,17 @@ class EventoValidacaoTest {
         criar(corpo(descricao = "a".repeat(2001)))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("\$.fieldErrors[0].field").value("descricao"))
+    }
+
+    @Test
+    fun `campos obrigatorios ausentes devolvem 400 com cada campo`() {
+        criar("{}")
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("\$.message").value("Dados inválidos na requisição"))
+            .andExpect(
+                jsonPath("\$.fieldErrors[*].field")
+                    .value(containsInAnyOrder("titulo", "dataInicio", "dataFim", "vagas", "cep"))
+            )
     }
 
     @Test

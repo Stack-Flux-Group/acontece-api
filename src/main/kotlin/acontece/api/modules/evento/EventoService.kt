@@ -40,14 +40,14 @@ class EventoService(
     // para não segurar uma conexão do banco (o pool tem só 3) enquanto espera a internet.
 
     fun criar(dto: EventoRequestDTO): EventoResponseDTO {
-        validarDatas(dto)
+        val (inicio, fim) = validarDatas(dto)
         val endereco = buscarEndereco(dto.cep, dto.numero)
         val evento =
             Evento(
                 titulo = dto.titulo,
                 descricao = dto.descricao,
-                dataInicio = dto.dataInicio,
-                dataFim = dto.dataFim,
+                dataInicio = inicio,
+                dataFim = fim,
                 vagas = dto.vagas,
                 endereco = endereco,
                 fotoUrl = dto.fotoUrl,
@@ -56,7 +56,7 @@ class EventoService(
     }
 
     fun atualizar(id: Long, dto: EventoRequestDTO): EventoResponseDTO {
-        validarDatas(dto)
+        val (inicio, fim) = validarDatas(dto)
         val endereco = buscarEndereco(dto.cep, dto.numero)
 
         // Daqui para baixo é uma transação só: se algo falhar no meio, nada é gravado.
@@ -65,8 +65,8 @@ class EventoService(
                 val evento = buscarEntidade(id) // 404 se não existir
                 evento.titulo = dto.titulo
                 evento.descricao = dto.descricao
-                evento.dataInicio = dto.dataInicio
-                evento.dataFim = dto.dataFim
+                evento.dataInicio = inicio
+                evento.dataFim = fim
                 evento.vagas = dto.vagas
                 evento.endereco = endereco
                 evento.fotoUrl = dto.fotoUrl
@@ -84,11 +84,14 @@ class EventoService(
         repository.findByIdOrNull(id)
             ?: throw ResourceNotFoundException("Evento com id $id não encontrado")
 
-    // Data de fim tem que ser depois da data de início -> senão 400
-    private fun validarDatas(dto: EventoRequestDTO) =
-        require(dto.dataFim.isAfter(dto.dataInicio)) {
-            "A data de fim deve ser posterior à data de início"
-        }
+    // Data de fim tem que ser depois da data de início -> senão 400. Devolve as duas já sem null:
+    // o @Valid do controller barra datas ausentes; o requireNotNull cobre quem chama o service direto.
+    private fun validarDatas(dto: EventoRequestDTO): Pair<LocalDateTime, LocalDateTime> {
+        val inicio = requireNotNull(dto.dataInicio) { "A data de início é obrigatória" }
+        val fim = requireNotNull(dto.dataFim) { "A data de fim é obrigatória" }
+        require(fim.isAfter(inicio)) { "A data de fim deve ser posterior à data de início" }
+        return inicio to fim
+    }
 
     // Chama ViaCEP e transforma a resposta no Endereco da entidade
     private fun buscarEndereco(cep: String, numero: String?): Endereco {
