@@ -1,7 +1,9 @@
 package acontece.api.modules.usuario
 
+import acontece.api.enums.StatusUsuario
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 import org.hibernate.validator.constraints.br.CPF
@@ -67,12 +69,19 @@ data class ParticipantePatchRequest(
     )
 }
 
+// Corpo de PATCH /participantes/{id}/status. Só ATIVO ou INATIVO: excluir é pelo DELETE.
+data class AlterarStatusParticipanteRequest(
+    @field:NotNull(message = "O status é obrigatório")
+    val status: StatusUsuario? = null,
+)
+
 data class ParticipanteResponse(
     val id: Long,
     val nome: String,
     val email: String,
     val cpf: String,
-    val telefone: String?
+    val telefone: String?,
+    val status: StatusUsuario,
 )
 
 fun Participante.toResponse() = ParticipanteResponse(
@@ -80,5 +89,6 @@ fun Participante.toResponse() = ParticipanteResponse(
     nome = nome,
     email = email,
     cpf = cpf,
-    telefone = telefone
+    telefone = telefone,
+    status = status,
 )

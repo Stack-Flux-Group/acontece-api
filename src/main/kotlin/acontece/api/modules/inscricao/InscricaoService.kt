@@ -1,6 +1,7 @@
 package acontece.api.modules.inscricao
 
 import acontece.api.enums.StatusInscricao
+import acontece.api.enums.StatusUsuario
 import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
 import acontece.api.modules.evento.EventoRepository
@@ -28,9 +29,14 @@ class InscricaoService(
         val participanteId = requireNotNull(request.participanteId) { "O participante é obrigatório" }
         val eventoId = requireNotNull(request.eventoId) { "O evento é obrigatório" }
 
+        // A trava no participante segura uma inativação/exclusão que chegue ao mesmo tempo: ou a
+        // inscrição entra antes (e a inativação a cancela), ou a conta já está inativa e ela é recusada.
         val participante =
-            participanteRepository.findByIdOrNull(participanteId)
+            participanteRepository.buscarComTrava(participanteId)?.takeIf { it.status != StatusUsuario.EXCLUIDO }
                 ?: throw ResourceNotFoundException("Participante $participanteId não encontrado")
+        if (participante.status != StatusUsuario.ATIVO) {
+            throw ConflictException("A conta do participante está inativa")
+        }
 
         // Aqui a linha do evento fica travada até o fim da transação: as checagens abaixo (duplicada
         // e vagas) rodam uma inscrição de cada vez por evento, então ninguém passa do limite.
@@ -111,6 +117,17 @@ class InscricaoService(
         inscricao.status = StatusInscricao.CANCELADA
         return inscricao.toResponse()
     }
+
+    // Chamado ao inativar ou excluir a conta: libera as vagas que o participante ainda ocupava.
+    // Roda dentro da transação de quem chamou, que já travou o participante.
+    @Transactional
+    fun cancelarEmAbertoDoParticipante(participanteId: Long): Int =
+        repository.cancelarEmAbertoDoParticipante(
+            participanteId,
+            LocalDateTime.now(clock),
+            StatusInscricao.QUE_OCUPAM_VAGA,
+            StatusInscricao.CANCELADA,
+        )
 
     private fun obter(id: Long): Inscricao =
         repository.findByIdOrNull(id) ?: throw ResourceNotFoundException("Inscrição $id não encontrada")

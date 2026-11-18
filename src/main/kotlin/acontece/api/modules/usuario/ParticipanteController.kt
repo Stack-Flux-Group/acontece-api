@@ -63,7 +63,29 @@ class ParticipanteController(
         @Valid @RequestBody request: ParticipantePatchRequest
     ): ParticipanteResponse = service.atualizar(id, request)
 
-    @Operation(summary = "Excluir participante", description = "O próprio participante ou um organizador.")
+    @Operation(
+        summary = "Ativar ou inativar participante",
+        description =
+            "Somente organizador. `INATIVO` bloqueia a conta: o login responde 403 pedindo para falar com " +
+                "o organizador e o token atual passa a dar 401. As inscrições em eventos que ainda não " +
+                "acabaram são canceladas e não voltam ao reativar. `ATIVO` libera a conta de novo. " +
+                "`EXCLUIDO` não é aceito (400): use o DELETE.",
+    )
+    // Só organizador (regra na SecurityConfig).
+    @PatchMapping("/{id}/status")
+    fun alterarStatus(
+        @PathVariable id: Long,
+        @Valid @RequestBody request: AlterarStatusParticipanteRequest,
+    ): ParticipanteResponse = service.alterarStatus(id, request)
+
+    @Operation(
+        summary = "Excluir participante",
+        description =
+            "O próprio participante ou um organizador. Não dá para desfazer: nome, e-mail, CPF, telefone e " +
+                "senha são apagados, as inscrições em eventos que ainda não acabaram são canceladas e o " +
+                "participante passa a dar 404. As inscrições antigas ficam no histórico como " +
+                "\"Participante excluído\". O e-mail e o CPF ficam livres para um novo cadastro.",
+    )
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ORGANIZADOR') or #id.toString() == authentication.name")
     @ResponseStatus(HttpStatus.NO_CONTENT)

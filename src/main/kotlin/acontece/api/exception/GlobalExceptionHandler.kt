@@ -1,5 +1,6 @@
 package acontece.api.exception
 
+import acontece.api.modules.auth.ContaIndisponivelException
 import acontece.api.modules.auth.LoginBloqueadoException
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
@@ -105,6 +106,14 @@ class GlobalExceptionHandler {
         request: HttpServletRequest,
     ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         build(HttpStatus.UNAUTHORIZED, ex.message ?: "Credenciais inválidas", request)
+
+    // 403 - senha certa, mas a conta foi inativada pelo organizador
+    @ExceptionHandler(ContaIndisponivelException::class)
+    fun handleContaIndisponivel(
+        ex: ContaIndisponivelException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> =
+        build(HttpStatus.FORBIDDEN, ex.message ?: "Conta indisponível", request)
 
     // 429 - errou a senha vezes demais; Retry-After diz em quantos segundos pode tentar de novo
     @ExceptionHandler(LoginBloqueadoException::class)

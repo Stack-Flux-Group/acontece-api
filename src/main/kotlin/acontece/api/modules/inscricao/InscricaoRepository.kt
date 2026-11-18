@@ -2,11 +2,13 @@ package acontece.api.modules.inscricao
 
 import acontece.api.enums.StatusInscricao
 import jakarta.persistence.LockModeType
+import java.time.LocalDateTime
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
@@ -49,6 +51,26 @@ interface InscricaoRepository : JpaRepository<Inscricao, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Inscricao i WHERE i.id = :id")
     fun buscarParaAtualizar(@Param("id") id: Long): Inscricao?
+
+    // Cancela de uma vez as inscrições que ocupam vaga em eventos que ainda não acabaram (as de eventos
+    // encerrados ficam como histórico). Usado quando a conta do participante é inativada ou excluída.
+    // O evento vai por subconsulta porque UPDATE em JPQL não aceita JOIN. Sem clearAutomatically de
+    // propósito: limpar o contexto descartaria as mudanças que quem chamou ainda vai fazer no participante.
+    @Modifying(flushAutomatically = true)
+    @Query(
+        """
+        UPDATE Inscricao i SET i.status = :cancelada
+        WHERE i.participante.id = :participanteId
+          AND i.status IN :ativas
+          AND i.evento.id IN (SELECT e.id FROM Evento e WHERE e.dataFim > :agora)
+        """
+    )
+    fun cancelarEmAbertoDoParticipante(
+        @Param("participanteId") participanteId: Long,
+        @Param("agora") agora: LocalDateTime,
+        @Param("ativas") ativas: Collection<StatusInscricao>,
+        @Param("cancelada") cancelada: StatusInscricao,
+    ): Int
 
     // Cada filtro é ignorado quando vem nulo: "IS NULL OR ..." deixa a condição sempre verdadeira.
     // @EntityGraph busca participante e evento no mesmo SELECT (JOIN). Sem ele, a resposta de cada

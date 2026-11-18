@@ -1,5 +1,6 @@
 package acontece.api.modules.auth
 
+import acontece.api.enums.StatusUsuario
 import acontece.api.modules.usuario.Usuario
 import acontece.api.modules.usuario.UsuarioRepository
 import java.time.Instant
@@ -35,6 +36,12 @@ class AuthService(
         }
 
         limite.registrarSucesso(ip, email)
+
+        // Só depois de conferir a senha: quem não sabe a senha não descobre que a conta existe.
+        // (Conta excluída nem chega aqui, porque fica sem senha e sem o e-mail original.)
+        if (usuario.status != StatusUsuario.ATIVO) {
+            throw ContaIndisponivelException(ContaIndisponivelException.CONTA_INATIVA)
+        }
         return tokenService.gerar(usuario)
     }
 
@@ -69,9 +76,9 @@ class AuthService(
         limite.registrarSucesso(ip, usuario.email)
     }
 
-    // O token continua válido até expirar, mesmo que a conta seja excluída nesse meio-tempo.
-    // Nesse caso a resposta é 401, e não 404: para o front, a sessão acabou e é preciso entrar de novo.
+    // A SecurityConfig já recusa o token de conta inativa ou excluída antes de chegar aqui; isto
+    // cobre só o usuário que sumiu do banco. Resposta 401, e não 404: para o front, a sessão acabou.
     private fun obterLogado(id: Long): Usuario =
         repository.findByIdOrNull(id)
-            ?: throw BadCredentialsException("Sua conta não existe mais. Entre novamente.")
+            ?: throw BadCredentialsException(ContaIndisponivelException.CONTA_EXCLUIDA)
 }

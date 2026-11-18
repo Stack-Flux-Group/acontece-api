@@ -8,6 +8,7 @@ import acontece.api.enums.StatusInscricao.CONFIRMADA
 import acontece.api.enums.StatusInscricao.PENDENTE
 import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
+import acontece.api.modules.usuario.UsuarioRepository
 import java.time.LocalDateTime
 import kotlin.test.Test
 import org.mockito.BDDMockito.given
@@ -43,6 +44,9 @@ class InscricaoControllerTest {
 
     // A SecurityConfig exige um decoder; aqui o token já vem autenticado, então ele nunca é usado.
     @MockitoBean lateinit var jwtDecoder: JwtDecoder
+
+    // A SecurityConfig confere o status da conta no banco; com o token simulado do teste ela nem é chamada.
+    @MockitoBean lateinit var usuarios: UsuarioRepository
 
     private val inscricao =
         InscricaoResponse(
