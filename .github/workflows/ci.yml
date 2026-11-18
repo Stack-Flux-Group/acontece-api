@@ -1,0 +1,41 @@
+name: CI
+
+# Roda o build e todos os testes em cada PR para a main e em cada push na main.
+# O PR só deve ser mesclado com este check verde.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Um push novo no mesmo PR cancela a execução anterior, que já ficou velha.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: Build e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven # guarda o ~/.m2 entre execuções: o build fica bem mais rápido
+
+      - name: Compilar e rodar os testes
+        run: ./mvnw -B verify
+
+      # Se algum teste falhar, os relatórios ficam disponíveis para download na aba do workflow.
+      - name: Guardar relatórios dos testes
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorios-surefire
+          path: target/surefire-reports/
+          retention-days: 7
