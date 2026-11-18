@@ -42,13 +42,17 @@ data class EventoResponseDTO(
     val dataInicio: LocalDateTime,
     val dataFim: LocalDateTime,
     val vagas: Int,
+    // Vagas que ainda podem ser ocupadas: vagas menos as inscrições PENDENTE e CONFIRMADA.
+    // Zero quer dizer evento lotado.
+    val vagasDisponiveis: Int,
     val endereco: Endereco,
     val fotoUrl: String?,
 )
 
-// Função de extensão: permite escrever evento.toResponse()
-// em vez de montar o DTO na mão toda vez.
-fun Evento.toResponse() =
+// Função de extensão: permite escrever evento.toResponse(ocupadas)
+// em vez de montar o DTO na mão toda vez. `vagasOcupadas` vem do EventoService, que conta as
+// inscrições ativas (o Evento não conhece as próprias inscrições).
+fun Evento.toResponse(vagasOcupadas: Long) =
     EventoResponseDTO(
         id = id!!, // depois de salvo, o id nunca é null
         titulo = titulo,
@@ -56,6 +60,8 @@ fun Evento.toResponse() =
         dataInicio = dataInicio,
         dataFim = dataFim,
         vagas = vagas,
+        // Nunca negativo, mesmo que algum dado antigo tenha mais inscrições do que vagas.
+        vagasDisponiveis = (vagas - vagasOcupadas).coerceAtLeast(0).toInt(),
         endereco = endereco,
         fotoUrl = fotoUrl,
     )

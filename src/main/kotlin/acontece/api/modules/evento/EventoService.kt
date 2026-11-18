@@ -29,19 +29,22 @@ class EventoService(
 
     // Leitura
 
-    fun listar(): List<EventoResponseDTO> = repository.findAll().map { it.toResponse() }
+    fun listar(): List<EventoResponseDTO> = respostas(repository.findAll())
 
-    fun buscarPorId(id: Long): EventoResponseDTO = buscarEntidade(id).toResponse()
+    fun buscarPorId(id: Long): EventoResponseDTO {
+        val evento = buscarEntidade(id)
+        return evento.toResponse(ocupadas(id))
+    }
 
     fun buscarPorTitulo(titulo: String): List<EventoResponseDTO> =
-        repository.findByTituloContainingIgnoreCase(titulo).map { it.toResponse() }
+        respostas(repository.findByTituloContainingIgnoreCase(titulo))
 
     fun buscarPorPeriodo(inicio: LocalDateTime, fim: LocalDateTime): List<EventoResponseDTO> {
         // require: se a condição for falsa, lança illegalargumentexception com 400
         require(!fim.isBefore(inicio)) {
             "A data final do filtro deve ser igual ou posterior à inicial"
         }
-        return repository.buscarPorPeriodo(inicio, fim).map { it.toResponse() }
+        return respostas(repository.buscarPorPeriodo(inicio, fim))
     }
 
     // Busca de GET /eventos: cada filtro é opcional e os que vierem se somam (E).
@@ -57,10 +60,28 @@ class EventoService(
                 "A data final do filtro deve ser igual ou posterior à inicial"
             }
         }
-        return repository
-            .findAll(EventoFiltros.de(titulo, inicio, fim), comOrdemValida(pageable))
-            .map { it.toResponse() }
+        val pagina = repository.findAll(EventoFiltros.de(titulo, inicio, fim), comOrdemValida(pageable))
+        val ocupadas = ocupadasPorEvento(pagina.content)
+        return pagina.map { it.toResponse(ocupadas[it.id] ?: 0) }
     }
+
+    // Monta a resposta de vários eventos com uma consulta de contagem só, seja qual for o tamanho
+    // da lista (em vez de uma por evento).
+    private fun respostas(eventos: List<Evento>): List<EventoResponseDTO> {
+        val ocupadas = ocupadasPorEvento(eventos)
+        return eventos.map { it.toResponse(ocupadas[it.id] ?: 0) }
+    }
+
+    // id do evento -> inscrições que ocupam vaga. Eventos sem inscrição ativa ficam de fora (0).
+    private fun ocupadasPorEvento(eventos: List<Evento>): Map<Long, Long> {
+        if (eventos.isEmpty()) return emptyMap() // "IN ()" vazio nem chega ao banco
+        return inscricaoRepository
+            .contarPorEvento(eventos.map { it.id!! }, StatusInscricao.QUE_OCUPAM_VAGA)
+            .associate { it.eventoId to it.ocupadas }
+    }
+
+    private fun ocupadas(eventoId: Long): Long =
+        inscricaoRepository.countByEventoIdAndStatusIn(eventoId, StatusInscricao.QUE_OCUPAM_VAGA)
 
     // Só deixa ordenar pelos campos conhecidos: um `sort=xyz` qualquer viraria erro 500 no banco,
     // aqui vira 400 com a lista do que é aceito. O id entra por último como desempate, para a mesma
@@ -92,7 +113,8 @@ class EventoService(
                 endereco = endereco,
                 fotoUrl = dto.fotoUrl,
             )
-        return repository.save(evento).toResponse() // o save abre e fecha a própria transação
+        // Evento recém-criado não tem inscrições: todas as vagas estão disponíveis.
+        return repository.save(evento).toResponse(vagasOcupadas = 0) // o save abre e fecha a própria transação
     }
 
     fun atualizar(id: Long, dto: EventoRequestDTO): EventoResponseDTO {
@@ -108,8 +130,7 @@ class EventoService(
                     repository.buscarComTrava(id)
                         ?: throw ResourceNotFoundException("Evento com id $id não encontrado")
 
-                val ocupadas =
-                    inscricaoRepository.countByEventoIdAndStatusIn(id, StatusInscricao.QUE_OCUPAM_VAGA)
+                val ocupadas = ocupadas(id)
                 if (dto.vagas < ocupadas) {
                     throw ConflictException(
                         "O evento já tem $ocupadas inscrições ativas; as vagas não podem ficar abaixo disso"
@@ -123,7 +144,7 @@ class EventoService(
                 evento.vagas = dto.vagas
                 evento.endereco = endereco
                 evento.fotoUrl = dto.fotoUrl
-                evento.toResponse() // o JPA grava as mudanças sozinho ao fim da transação
+                evento.toResponse(ocupadas) // o JPA grava as mudanças sozinho ao fim da transação
             }
         return checkNotNull(atualizado)
     }

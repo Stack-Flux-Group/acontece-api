@@ -113,6 +113,24 @@ class PostgresIntegracaoTest {
     }
 
     @Test
+    fun `contagem de inscricoes ativas agrupada por evento`() {
+        val evento = novoEvento()
+        val outroEvento = novoEvento()
+        val semInscricao = novoEvento()
+        inscricoes.save(Inscricao(participante = novoParticipante(), evento = evento, status = PENDENTE))
+        inscricoes.save(Inscricao(participante = novoParticipante(), evento = evento, status = CONFIRMADA))
+        inscricoes.save(Inscricao(participante = novoParticipante(), evento = outroEvento, status = CANCELADA))
+
+        val ocupadas =
+            inscricoes
+                .contarPorEvento(listOf(evento.id!!, outroEvento.id!!, semInscricao.id!!), listOf(PENDENTE, CONFIRMADA))
+                .associate { it.eventoId to it.ocupadas }
+
+        // Só aparece quem tem inscrição ativa; cancelada não conta.
+        assertEquals(mapOf(evento.id!! to 2L), ocupadas)
+    }
+
+    @Test
     fun `busca de evento por titulo ignora maiusculas`() {
         novoEvento(titulo = "Semana de Tecnologia")
         novoEvento(titulo = "Festival de Música")

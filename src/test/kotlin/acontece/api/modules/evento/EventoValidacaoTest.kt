@@ -69,6 +69,7 @@ class EventoValidacaoTest {
             dataInicio = LocalDateTime.of(2030, 12, 1, 19, 0),
             dataFim = LocalDateTime.of(2030, 12, 1, 22, 0),
             vagas = 10,
+            vagasDisponiveis = 10,
             endereco = Endereco("01001-000", "Praça da Sé", "Sé", "São Paulo", "SP"),
             fotoUrl = "https://cdn.exemplo.com/foto.png",
         )
