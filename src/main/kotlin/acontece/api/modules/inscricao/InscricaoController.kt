@@ -88,4 +88,15 @@ class InscricaoController(
         @PathVariable id: Long,
         @Valid @RequestBody request: AtualizarStatusRequest
     ): InscricaoResponse = service.atualizarStatus(id, request)
+
+    @Operation(
+        summary = "Cancelar a própria inscrição",
+        description =
+            "Somente participante, e só a própria inscrição (403 se for de outro). Funciona com a inscrição " +
+                "PENDENTE ou CONFIRMADA; já cancelada dá 409 e evento encerrado dá 400. A vaga é liberada.",
+    )
+    // Sem corpo: o novo status é sempre CANCELADA e quem pede é sempre o participante do token.
+    @PatchMapping("/{id}/cancelar")
+    fun cancelar(@PathVariable id: Long, @AuthenticationPrincipal jwt: Jwt): InscricaoResponse =
+        service.cancelarPeloParticipante(id, jwt.usuarioId)
 }

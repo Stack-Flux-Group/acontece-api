@@ -3,6 +3,7 @@ package acontece.api.modules.inscricao
 import acontece.api.comoOrganizador
 import acontece.api.comoParticipante
 import acontece.api.config.SecurityConfig
+import acontece.api.enums.StatusInscricao.CANCELADA
 import acontece.api.enums.StatusInscricao.CONFIRMADA
 import acontece.api.enums.StatusInscricao.PENDENTE
 import acontece.api.exception.ConflictException
@@ -15,6 +16,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.mockito.BDDMockito.never
 import org.mockito.BDDMockito.then
@@ -290,6 +292,51 @@ class InscricaoControllerTest {
                     .content("""{"status": "PENDENTE"}""")
             )
             .andExpect(status().isConflict)
+    }
+
+    @Test
+    fun `PATCH cancelar usa o participante do token e devolve 200`() {
+        given(service.cancelarPeloParticipante(10L, 1L)).willReturn(inscricao.copy(status = CANCELADA))
+
+        mockMvc
+            .perform(patch("/inscricoes/10/cancelar").with(comoParticipante(1)))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("\$.status").value("CANCELADA"))
+    }
+
+    @Test
+    fun `PATCH cancelar inscricao de outro participante devolve 403`() {
+        given(service.cancelarPeloParticipante(10L, 2L))
+            .willThrow(AccessDeniedException("Acesso negado a esta inscrição"))
+
+        mockMvc
+            .perform(patch("/inscricoes/10/cancelar").with(comoParticipante(2)))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `PATCH cancelar ja cancelada devolve 409`() {
+        given(service.cancelarPeloParticipante(10L, 1L))
+            .willThrow(ConflictException("A inscrição já está cancelada"))
+
+        mockMvc
+            .perform(patch("/inscricoes/10/cancelar").with(comoParticipante(1)))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("\$.message").value("A inscrição já está cancelada"))
+    }
+
+    @Test
+    fun `PATCH cancelar como organizador devolve 403 e nem chega ao service`() {
+        mockMvc
+            .perform(patch("/inscricoes/10/cancelar").with(comoOrganizador()))
+            .andExpect(status().isForbidden)
+
+        then(service).should(never()).cancelarPeloParticipante(10L, 100L)
+    }
+
+    @Test
+    fun `PATCH cancelar sem token devolve 401`() {
+        mockMvc.perform(patch("/inscricoes/10/cancelar")).andExpect(status().isUnauthorized)
     }
 
     @Test
