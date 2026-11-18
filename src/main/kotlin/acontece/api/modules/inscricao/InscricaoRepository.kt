@@ -10,10 +10,32 @@ import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
+// Uma linha do resultado de contarPorEvento: o Spring preenche pelos apelidos (AS) da consulta.
+interface OcupacaoDoEvento {
+    val eventoId: Long
+    val ocupadas: Long
+}
+
 interface InscricaoRepository : JpaRepository<Inscricao, Long> {
 
     // Quantas inscrições do evento estão num dos status dados (usado para contar as que ocupam vaga)
     fun countByEventoIdAndStatusIn(eventoId: Long, statuses: Collection<StatusInscricao>): Long
+
+    // A mesma contagem para vários eventos de uma vez (GROUP BY), usada nas listagens de eventos.
+    // Sem ela, cada evento da página dispararia a própria consulta de contagem.
+    // Evento sem nenhuma inscrição nos status dados não aparece no resultado.
+    @Query(
+        """
+        SELECT i.evento.id AS eventoId, COUNT(i) AS ocupadas
+        FROM Inscricao i
+        WHERE i.evento.id IN :eventoIds AND i.status IN :statuses
+        GROUP BY i.evento.id
+        """
+    )
+    fun contarPorEvento(
+        @Param("eventoIds") eventoIds: Collection<Long>,
+        @Param("statuses") statuses: Collection<StatusInscricao>,
+    ): List<OcupacaoDoEvento>
 
     fun existsByParticipanteIdAndEventoIdAndStatusIn(
         participanteId: Long,

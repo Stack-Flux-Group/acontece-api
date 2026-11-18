@@ -23,8 +23,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.BDDMockito.given
+import jakarta.persistence.EntityManagerFactory
+import kotlin.test.assertTrue
+import org.hibernate.SessionFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.data.domain.PageRequest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.support.TransactionSynchronizationManager
 
@@ -38,10 +42,13 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
             "spring.datasource.username=sa",
             "spring.datasource.password=",
             "spring.jpa.hibernate.ddl-auto=create-drop",
+            // Permite contar quantas consultas SQL o Hibernate executou.
+            "spring.jpa.properties.hibernate.generate_statistics=true",
         ]
 )
 class EventoServiceTest {
 
+    @Autowired lateinit var entityManagerFactory: EntityManagerFactory
     @Autowired lateinit var service: EventoService
     @Autowired lateinit var eventos: EventoRepository
     @Autowired lateinit var inscricoes: InscricaoRepository
@@ -153,6 +160,68 @@ class EventoServiceTest {
     @Test
     fun `atualizar evento inexistente devolve 404`() {
         assertFailsWith<ResourceNotFoundException> { service.atualizar(999999L, pedido()) }
+    }
+
+    @Test
+    fun `evento recem criado tem todas as vagas disponiveis`() {
+        assertEquals(5, service.criar(pedido(vagas = 5)).vagasDisponiveis)
+    }
+
+    @Test
+    fun `vagas disponiveis descontam so as inscricoes ativas`() {
+        val criado = service.criar(pedido(vagas = 5))
+        inscrever(criado.id, PENDENTE)
+        inscrever(criado.id, CONFIRMADA)
+        inscrever(criado.id, CANCELADA) // cancelada libera a vaga
+
+        assertEquals(3, service.buscarPorId(criado.id).vagasDisponiveis)
+        // A edição também devolve o número já descontado.
+        assertEquals(8, service.atualizar(criado.id, pedido(vagas = 10)).vagasDisponiveis)
+    }
+
+    @Test
+    fun `evento lotado mostra zero vagas disponiveis`() {
+        val criado = service.criar(pedido(vagas = 2))
+        inscrever(criado.id, PENDENTE)
+        inscrever(criado.id, CONFIRMADA)
+
+        assertEquals(0, service.buscarPorId(criado.id).vagasDisponiveis)
+    }
+
+    @Test
+    fun `listagens calculam as vagas de cada evento`() {
+        val lotado = service.criar(pedido(vagas = 1))
+        val comVaga = service.criar(pedido(vagas = 3))
+        val vazio = service.criar(pedido(vagas = 4))
+        inscrever(lotado.id, PENDENTE)
+        inscrever(comVaga.id, CONFIRMADA)
+
+        val esperado = mapOf(lotado.id to 0, comVaga.id to 2, vazio.id to 4)
+        assertEquals(esperado, service.listar().associate { it.id to it.vagasDisponiveis })
+        assertEquals(
+            esperado,
+            service.buscar(null, null, null, PageRequest.of(0, 20)).content.associate { it.id to it.vagasDisponiveis },
+        )
+    }
+
+    @Test
+    fun `listagem nao faz uma contagem por evento`() {
+        repeat(5) {
+            val evento = service.criar(pedido())
+            inscrever(evento.id, PENDENTE)
+        }
+        val estatisticas = entityManagerFactory.unwrap(SessionFactory::class.java).statistics
+        estatisticas.clear()
+
+        val pagina = service.buscar(null, null, null, PageRequest.of(0, 20))
+
+        assertEquals(5, pagina.content.size)
+        // Uma consulta traz os eventos e outra conta as inscrições de todos de uma vez (GROUP BY).
+        // Sem isso seriam 1 + 5 contagens, uma por evento.
+        assertTrue(
+            estatisticas.prepareStatementCount <= 2,
+            "consultas executadas: ${estatisticas.prepareStatementCount}",
+        )
     }
 
     private companion object {
