@@ -4,6 +4,7 @@ import acontece.api.enums.StatusUsuario
 import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
 import acontece.api.modules.inscricao.InscricaoService
+import acontece.api.notificacao.TelegramNotificador
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Page
 import org.springframework.data.repository.findByIdOrNull
@@ -20,6 +21,7 @@ class ParticipanteService(
     private val passwordEncoder: PasswordEncoder,
     // Inativar ou excluir a conta cancela as inscrições em aberto.
     private val inscricaoService: InscricaoService,
+    private val notificador: TelegramNotificador,
 ) {
 
     @Transactional
@@ -34,7 +36,9 @@ class ParticipanteService(
             throw ConflictException(EMAIL_EM_USO)
         }
 
-        return repository.save(dados.toEntity(passwordEncoder.encode(dados.senha)!!)).toResponse()
+        val resposta = repository.save(dados.toEntity(passwordEncoder.encode(dados.senha)!!)).toResponse()
+        notificador.contaCriada(resposta.nome, resposta.email)
+        return resposta
     }
 
     @Transactional(readOnly = true)
@@ -75,11 +79,20 @@ class ParticipanteService(
             "Para excluir a conta, use DELETE /participantes/{id}"
         }
         val participante = obterComTrava(id)
+        val statusAnterior = participante.status
 
-        if (novoStatus == StatusUsuario.INATIVO && participante.status == StatusUsuario.ATIVO) {
+        if (novoStatus == StatusUsuario.INATIVO && statusAnterior == StatusUsuario.ATIVO) {
             inscricaoService.cancelarEmAbertoDoParticipante(id)
         }
         participante.status = novoStatus
+
+        // Só avisa na mudança de verdade: repetir o status atual não notifica.
+        when {
+            statusAnterior == StatusUsuario.ATIVO && novoStatus == StatusUsuario.INATIVO ->
+                notificador.contaInativada(participante.nome, participante.email)
+            statusAnterior == StatusUsuario.INATIVO && novoStatus == StatusUsuario.ATIVO ->
+                notificador.contaReativada(participante.nome, participante.email)
+        }
         return participante.toResponse()
     }
 
@@ -87,10 +100,14 @@ class ParticipanteService(
     // Os dados pessoais são apagados e a conta fica EXCLUIDO, o que, para a API, é o mesmo que não
     // existir mais (404 em tudo e token recusado).
     @Transactional
-    fun excluir(id: Long) {
+    fun excluir(id: Long, peloProprioParticipante: Boolean) {
         val participante = obterComTrava(id)
+        // Pega nome e e-mail antes de anonimizar: depois disso eles não existem mais.
+        val nome = participante.nome
+        val email = participante.email
         inscricaoService.cancelarEmAbertoDoParticipante(id)
         participante.anonimizar()
+        notificador.contaExcluida(nome, email, peloProprioParticipante)
     }
 
     private fun obter(id: Long): Participante =

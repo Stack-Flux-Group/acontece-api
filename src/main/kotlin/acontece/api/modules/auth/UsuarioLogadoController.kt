@@ -47,5 +47,5 @@ class UsuarioLogadoController(
         @Valid @RequestBody request: TrocarSenhaRequest,
         @AuthenticationPrincipal jwt: Jwt,
         http: HttpServletRequest,
-    ) = service.trocarSenha(jwt.usuarioId, request, http.remoteAddr)
+    ) = service.trocarSenha(jwt.usuarioId, request, http.ipDoCliente())
 }

@@ -11,6 +11,7 @@ import acontece.api.modules.evento.EventoRepository
 import acontece.api.modules.inscricao.Inscricao
 import acontece.api.modules.inscricao.InscricaoRepository
 import acontece.api.modules.inscricao.InscricaoService
+import acontece.api.notificacao.TelegramNotificador
 import jakarta.persistence.EntityManager
 import java.time.LocalDateTime
 import kotlin.test.Test
@@ -29,7 +30,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 
 // @DataJpaTest + @Import: banco H2 em memória com o service real (nada de mock, nada de Supabase).
 @DataJpaTest
-@Import(ParticipanteService::class, InscricaoService::class, ClockConfig::class)
+@Import(ParticipanteService::class, InscricaoService::class, ClockConfig::class, TelegramNotificador::class)
 class ParticipanteServiceTest {
 
     // O PasswordEncoder de verdade mora na SecurityConfig, que o @DataJpaTest não carrega.
@@ -82,7 +83,7 @@ class ParticipanteServiceTest {
         val cancelada = inscrever(maria.id, novoEvento(), StatusInscricao.CANCELADA)
         val antiga = inscrever(maria.id, novoEvento(fim = LocalDateTime.now().minusDays(1)), StatusInscricao.CONFIRMADA)
 
-        service.excluir(maria.id)
+        service.excluir(maria.id, peloProprioParticipante = false)
         gravarERelerDoBanco()
 
         // A linha continua (as inscrições apontam para ela), mas sem nenhum dado pessoal.
@@ -103,12 +104,12 @@ class ParticipanteServiceTest {
     @Test
     fun `participante excluido some da API`() {
         val maria = service.criar(pedido("maria@email.com"))
-        service.excluir(maria.id)
+        service.excluir(maria.id, peloProprioParticipante = false)
         gravarERelerDoBanco()
 
         assertFailsWith<ResourceNotFoundException> { service.buscarPorId(maria.id) }
         assertFailsWith<ResourceNotFoundException> { service.atualizar(maria.id, ParticipantePatchRequest(nome = "X")) }
-        assertFailsWith<ResourceNotFoundException> { service.excluir(maria.id) }
+        assertFailsWith<ResourceNotFoundException> { service.excluir(maria.id, peloProprioParticipante = false) }
         assertFailsWith<ResourceNotFoundException> {
             service.alterarStatus(maria.id, AlterarStatusParticipanteRequest(StatusUsuario.ATIVO))
         }
@@ -118,7 +119,7 @@ class ParticipanteServiceTest {
     @Test
     fun `e-mail e CPF de conta excluida ficam livres para novo cadastro`() {
         val maria = service.criar(pedido("maria@email.com"))
-        service.excluir(maria.id)
+        service.excluir(maria.id, peloProprioParticipante = false)
         gravarERelerDoBanco()
 
         val deNovo = service.criar(pedido("maria@email.com"))
@@ -132,8 +133,8 @@ class ParticipanteServiceTest {
         val ana = service.criar(pedido("ana@email.com", cpf = "52998224725"))
         val bia = service.criar(pedido("bia@email.com", cpf = "39053344705"))
 
-        service.excluir(ana.id)
-        service.excluir(bia.id)
+        service.excluir(ana.id, peloProprioParticipante = false)
+        service.excluir(bia.id, peloProprioParticipante = false)
         gravarERelerDoBanco() // as colunas são UNIQUE: valores repetidos falhariam aqui
     }
 

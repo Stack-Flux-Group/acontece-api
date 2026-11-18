@@ -30,5 +30,5 @@ class AuthController(
     fun login(
         @Valid @RequestBody request: LoginRequest,
         http: HttpServletRequest,
-    ): TokenResponse = service.login(request, http.remoteAddr)
+    ): TokenResponse = service.login(request, http.ipDoCliente())
 }
