@@ -31,7 +31,14 @@ class InscricaoServiceFusoTest {
     private val saoPaulo = ZoneId.of("America/Sao_Paulo")
 
     private fun servicoComRelogioEm(instante: String) =
-        InscricaoService(repository, eventos, participantes, Clock.fixed(Instant.parse(instante), saoPaulo))
+        InscricaoService(
+            repository,
+            eventos,
+            participantes,
+            Clock.fixed(Instant.parse(instante), saoPaulo),
+            // Publisher vazio: o teste não tem contexto Spring para entregar o evento de alerta.
+            TelegramNotificador(ApplicationEventPublisher {}),
+        )
 
     // Evento de 1/12/2026, das 10h às 19h (horário de Brasília)
     private fun eventoQueTerminaAs19h() =
