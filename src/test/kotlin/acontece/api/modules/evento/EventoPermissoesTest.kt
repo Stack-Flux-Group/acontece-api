@@ -31,20 +31,20 @@ class EventoPermissoesTest {
 
     @Test
     fun `sem token nao ve os eventos`() {
-        mockMvc.perform(get("/evento/listar/")).andExpect(status().isUnauthorized)
+        mockMvc.perform(get("/eventos")).andExpect(status().isUnauthorized)
     }
 
     @Test
     fun `participante lista e busca eventos`() {
-        mockMvc.perform(get("/evento/listar/").with(comoParticipante())).andExpect(status().isOk)
-        mockMvc.perform(get("/evento/buscar/1").with(comoParticipante())).andExpect(status().isOk)
+        mockMvc.perform(get("/eventos").with(comoParticipante())).andExpect(status().isOk)
+        mockMvc.perform(get("/eventos/1").with(comoParticipante())).andExpect(status().isOk)
     }
 
     @Test
     fun `participante nao cria evento`() {
         mockMvc
             .perform(
-                post("/evento/criar")
+                post("/eventos")
                     .with(comoParticipante())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}")
@@ -56,7 +56,7 @@ class EventoPermissoesTest {
     fun `participante nao edita evento`() {
         mockMvc
             .perform(
-                put("/evento/atualizar/1")
+                put("/eventos/1")
                     .with(comoParticipante())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}")
@@ -67,14 +67,14 @@ class EventoPermissoesTest {
     @Test
     fun `participante nao apaga evento`() {
         mockMvc
-            .perform(delete("/evento/deletar/1").with(comoParticipante()))
+            .perform(delete("/eventos/1").with(comoParticipante()))
             .andExpect(status().isForbidden)
     }
 
     @Test
     fun `organizador apaga evento`() {
         mockMvc
-            .perform(delete("/evento/deletar/1").with(comoOrganizador()))
+            .perform(delete("/eventos/1").with(comoOrganizador()))
             .andExpect(status().isNoContent)
     }
 }

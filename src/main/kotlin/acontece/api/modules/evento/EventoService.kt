@@ -8,6 +8,7 @@ import acontece.api.exception.ServicoExternoException
 import acontece.api.modules.inscricao.InscricaoRepository
 import feign.FeignException
 import java.time.LocalDateTime
+import org.springframework.data.domain.Sort
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -38,6 +39,19 @@ class EventoService(
             "A data final do filtro deve ser igual ou posterior à inicial"
         }
         return repository.buscarPorPeriodo(inicio, fim).map { it.toResponse() }
+    }
+
+    // Busca de GET /eventos: cada filtro é opcional e os que vierem se somam (E).
+    // Sem filtro nenhum, devolve todos. Sempre em ordem de data de início.
+    fun buscar(titulo: String?, inicio: LocalDateTime?, fim: LocalDateTime?): List<EventoResponseDTO> {
+        if (inicio != null && fim != null) {
+            require(!fim.isBefore(inicio)) {
+                "A data final do filtro deve ser igual ou posterior à inicial"
+            }
+        }
+        return repository
+            .findAll(EventoFiltros.de(titulo, inicio, fim), Sort.by("dataInicio", "id"))
+            .map { it.toResponse() }
     }
 
     // Escrita

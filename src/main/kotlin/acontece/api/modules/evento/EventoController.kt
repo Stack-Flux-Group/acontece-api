@@ -1,64 +1,79 @@
 package acontece.api.modules.evento
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import java.time.LocalDateTime
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.HttpStatus
-import org.springframework.web.bind.annotation.*
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
+import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 
 // Funções: Recebe requisição / Chama o Service / Devolve resposta
-
-// @RestController - Define que a classe é um controlador REST
-// @RequestMapping - Define o path base para todas as rotas do controlador
+// Rotas no padrão REST, iguais às de /participantes e /inscricoes: o recurso no plural e o verbo
+// HTTP dizendo a ação (POST cria, GET lê, PUT substitui, DELETE apaga).
 @Tag(name = "Eventos", description = "Qualquer usuário logado consulta; só o organizador administra")
 @RestController
-@RequestMapping("/evento")
+@RequestMapping("/eventos")
 class EventoController(
     private val service: EventoService // spring injeta o service sozinho
 ) {
 
-    // POST /eventos -> cria evento. 201 CREATED se der certo.
-    // @Valid dispara as validações do RequestDTO (@NotBlank, @Pattern...)
-    // @RequestBody transforma o JSON enviado no objeto dto
+    // POST /eventos -> 201 Created, com o endereço do evento novo no cabeçalho Location.
+    // @Valid dispara as validações do DTO (@NotBlank, @Pattern...)
     @Operation(summary = "Criar evento", description = "Somente organizador. O endereço é preenchido pelo CEP.")
-    @PostMapping("/criar")
-    @ResponseStatus(HttpStatus.CREATED)
-    fun criar(@Valid @RequestBody dto: EventoRequestDTO) = service.criar(dto)
+    @PostMapping
+    fun criar(@Valid @RequestBody dto: EventoRequestDTO): ResponseEntity<EventoResponseDTO> {
+        val criado = service.criar(dto)
+        val location =
+            ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(criado.id).toUri()
+        return ResponseEntity.created(location).body(criado)
+    }
 
-    // GET Listar todos os eventos
-    @Operation(summary = "Listar eventos")
-    @GetMapping("/listar/") fun listar() = service.listar()
+    // GET /eventos?titulo=semana&inicio=2026-11-01T00:00:00&fim=2026-12-31T23:59:59
+    // Todos os filtros são opcionais e se somam. @DateTimeFormat converte o texto da URL em data.
+    @Operation(
+        summary = "Listar e buscar eventos",
+        description =
+            "Sem filtros, devolve todos. `titulo` busca por parte do título (sem diferenciar maiúsculas); " +
+                "`inicio` e `fim` filtram pela data de início do evento. Ordenado pela data de início.",
+    )
+    @GetMapping
+    fun listar(
+        @Parameter(description = "Parte do título") @RequestParam(required = false) titulo: String?,
+        @Parameter(description = "Começa a partir de (ex.: 2026-12-01T00:00:00)")
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+        inicio: LocalDateTime?,
+        @Parameter(description = "Começa até (ex.: 2026-12-31T23:59:59)")
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+        fim: LocalDateTime?,
+    ): List<EventoResponseDTO> = service.buscar(titulo, inicio, fim)
 
-    // GET Busca evento por ID
     @Operation(summary = "Buscar evento por ID")
-    @GetMapping("/buscar/{id}") fun buscarPorId(@PathVariable id: Long) = service.buscarPorId(id)
+    @GetMapping("/{id}")
+    fun buscarPorId(@PathVariable id: Long): EventoResponseDTO = service.buscarPorId(id)
 
-    // GET Busca evento por Titulo
-    // ?titulo=xxx vira @RequestParam
-    @Operation(summary = "Buscar evento por título")
-    @GetMapping("/buscar/titulo")
-    fun buscarPorTitulo(@RequestParam titulo: String) = service.buscarPorTitulo(titulo)
-
-    // GET /eventos/periodo?inicio=2026-11-01T00:00:00&fim=2026-12-31T23:59:59
-    // @DateTimeFormat diz ao Spring como converter o texto da URL em data
-    @Operation(summary = "Buscar eventos por período", description = "Datas no formato 2026-12-01T19:00:00.")
-    @GetMapping("/buscar/periodo")
-    fun buscarPorPeriodo(
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) inicio: LocalDateTime,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) fim: LocalDateTime,
-    ) = service.buscarPorPeriodo(inicio, fim)
-
-    // PUT /eventos/5 -> atualiza todos os dados do evento
     @Operation(summary = "Atualizar evento", description = "Somente organizador. Substitui todos os dados.")
-    @PutMapping("/atualizar/{id}")
-    fun atualizar(@PathVariable id: Long, @Valid @RequestBody dto: EventoRequestDTO) =
+    @PutMapping("/{id}")
+    fun atualizar(@PathVariable id: Long, @Valid @RequestBody dto: EventoRequestDTO): EventoResponseDTO =
         service.atualizar(id, dto)
 
-    // DELETE /eventos/5 -> remove. 204 NO CONTENT (sucesso sem corpo de resposta)
+    // 204 No Content: sucesso sem corpo de resposta
     @Operation(summary = "Apagar evento", description = "Somente organizador.")
-    @DeleteMapping("/deletar/{id}")
+    @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun deletar(@PathVariable id: Long) = service.deletar(id)
 }

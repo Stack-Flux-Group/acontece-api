@@ -3,6 +3,7 @@ package acontece.api.modules.evento
 import jakarta.persistence.LockModeType
 import java.time.LocalDateTime
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
@@ -12,7 +13,9 @@ import org.springframework.data.repository.query.Param
 // @Query: serve quando a consulta é mais complexa ou você quer controlar exatamente o que é
 // executado.
 
-interface EventoRepository : JpaRepository<Evento, Long> {
+// JpaSpecificationExecutor: permite montar a consulta a partir dos filtros que vierem (ver
+// EventoFiltros), em vez de uma query para cada combinação.
+interface EventoRepository : JpaRepository<Evento, Long>, JpaSpecificationExecutor<Evento> {
 
     // Query method - Spring Data JPA vai gerar a implementação automaticamente
     // findBy + Titulo + Containing (LIKE %valor%) + IgnoreCase (case-insensitive)
