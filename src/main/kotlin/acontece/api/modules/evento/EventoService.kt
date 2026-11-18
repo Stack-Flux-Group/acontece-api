@@ -8,6 +8,9 @@ import acontece.api.exception.ServicoExternoException
 import acontece.api.modules.inscricao.InscricaoRepository
 import feign.FeignException
 import java.time.LocalDateTime
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -42,16 +45,34 @@ class EventoService(
     }
 
     // Busca de GET /eventos: cada filtro é opcional e os que vierem se somam (E).
-    // Sem filtro nenhum, devolve todos. Sempre em ordem de data de início.
-    fun buscar(titulo: String?, inicio: LocalDateTime?, fim: LocalDateTime?): List<EventoResponseDTO> {
+    // Sem filtro nenhum, devolve todos, uma página por vez.
+    fun buscar(
+        titulo: String?,
+        inicio: LocalDateTime?,
+        fim: LocalDateTime?,
+        pageable: Pageable,
+    ): Page<EventoResponseDTO> {
         if (inicio != null && fim != null) {
             require(!fim.isBefore(inicio)) {
                 "A data final do filtro deve ser igual ou posterior à inicial"
             }
         }
         return repository
-            .findAll(EventoFiltros.de(titulo, inicio, fim), Sort.by("dataInicio", "id"))
+            .findAll(EventoFiltros.de(titulo, inicio, fim), comOrdemValida(pageable))
             .map { it.toResponse() }
+    }
+
+    // Só deixa ordenar pelos campos conhecidos: um `sort=xyz` qualquer viraria erro 500 no banco,
+    // aqui vira 400 com a lista do que é aceito. O id entra por último como desempate, para a mesma
+    // linha nunca aparecer em duas páginas quando várias têm o mesmo valor no campo ordenado.
+    private fun comOrdemValida(pageable: Pageable): Pageable {
+        val invalidos = pageable.sort.map { it.property }.filter { it !in CAMPOS_ORDENAVEIS }.toList()
+        require(invalidos.isEmpty()) {
+            "Não é possível ordenar por ${invalidos.joinToString()}. Use: ${CAMPOS_ORDENAVEIS.joinToString()}"
+        }
+        val ordem = if (pageable.sort.isSorted) pageable.sort else Sort.by("dataInicio")
+        val comDesempate = if (ordem.getOrderFor("id") != null) ordem else ordem.and(Sort.by("id"))
+        return PageRequest.of(pageable.pageNumber, pageable.pageSize, comDesempate)
     }
 
     // Escrita
@@ -147,5 +168,10 @@ class EventoService(
             uf = resposta.uf ?: "",
             numero = numero,
         )
+    }
+
+    private companion object {
+        // Campos aceitos em `sort` na listagem de eventos.
+        val CAMPOS_ORDENAVEIS = listOf("dataInicio", "dataFim", "titulo", "vagas", "id")
     }
 }
