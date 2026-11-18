@@ -23,7 +23,7 @@ O app que consome esta API está em [acontece-frontend](https://github.com/Stack
 | Módulo | Resumo |
 |---|---|
 | **Autenticação** | `POST /auth/login` devolve o token JWT. Mande-o em `Authorization: Bearer <token>`. |
-| **Participantes** | Cadastro público (`POST /participantes`). Cada participante vê e edita só o próprio cadastro; o organizador vê todos. |
+| **Participantes** | Cadastro público (`POST /participantes`). Cada participante vê e edita só o próprio cadastro; o organizador vê todos. O organizador inativa e reativa contas (`PATCH /participantes/{id}/status`). Excluir a conta apaga os dados pessoais e mantém o histórico de inscrições. |
 | **Eventos** | Qualquer usuário logado consulta; só o organizador cria, edita e apaga. O endereço é buscado no ViaCEP. |
 | **Inscrições** | O participante se inscreve em nome próprio e vê só as suas. O organizador confirma ou cancela (`PENDENTE → CONFIRMADA → CANCELADA`). |
 

@@ -131,6 +131,19 @@ class PostgresIntegracaoTest {
     }
 
     @Test
+    fun `cancelamento em lote das inscricoes do participante`() {
+        val ana = novoParticipante()
+        val emAberto = inscricoes.save(Inscricao(participante = ana, evento = novoEvento(), status = CONFIRMADA))
+        val deOutro = inscricoes.save(Inscricao(participante = novoParticipante(), evento = novoEvento(), status = PENDENTE))
+
+        // UPDATE com subconsulta no evento: é o tipo de SQL que pode mudar entre H2 e Postgres.
+        assertEquals(1, inscricaoService.cancelarEmAbertoDoParticipante(ana.id!!))
+
+        assertEquals(CANCELADA, inscricoes.findById(emAberto.id!!).get().status)
+        assertEquals(PENDENTE, inscricoes.findById(deOutro.id!!).get().status)
+    }
+
+    @Test
     fun `busca de evento por titulo ignora maiusculas`() {
         novoEvento(titulo = "Semana de Tecnologia")
         novoEvento(titulo = "Festival de Música")

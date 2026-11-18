@@ -3,6 +3,7 @@ package acontece.api.modules.evento
 import acontece.api.comoOrganizador
 import acontece.api.config.SecurityConfig
 import acontece.api.exception.ServicoExternoException
+import acontece.api.modules.usuario.UsuarioRepository
 import java.time.LocalDateTime
 import kotlin.test.Test
 import org.hamcrest.Matchers.containsInAnyOrder
@@ -33,6 +34,9 @@ class EventoValidacaoTest {
     @MockitoBean lateinit var service: EventoService
 
     @MockitoBean lateinit var jwtDecoder: JwtDecoder
+
+    // A SecurityConfig confere o status da conta no banco; com o token simulado do teste ela nem é chamada.
+    @MockitoBean lateinit var usuarios: UsuarioRepository
 
     private fun criar(corpo: String) =
         mockMvc.perform(

@@ -1,7 +1,9 @@
 package acontece.api.modules.usuario
 
+import acontece.api.enums.StatusUsuario
 import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
+import acontece.api.modules.inscricao.InscricaoService
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Page
 import org.springframework.data.repository.findByIdOrNull
@@ -16,8 +18,10 @@ class ParticipanteService(
     // olha a tabela de usuários, não só a de participantes.
     private val usuarioRepository: UsuarioRepository,
     private val passwordEncoder: PasswordEncoder,
+    // Inativar ou excluir a conta cancela as inscrições em aberto.
+    private val inscricaoService: InscricaoService,
 ) {
-    
+
     @Transactional
     fun criar(request: ParticipanteRequest): ParticipanteResponse {
         val dados = request.normalizado()
@@ -36,9 +40,10 @@ class ParticipanteService(
     @Transactional(readOnly = true)
     fun buscarPorId(id: Long): ParticipanteResponse = obter(id).toResponse()
 
+    // Contas excluídas não aparecem; as inativas sim, para o organizador poder reativá-las.
     @Transactional(readOnly = true)
     fun listar(pageable: Pageable): Page<ParticipanteResponse> =
-        repository.findAll(pageable).map { it.toResponse() }
+        repository.findAllByStatusNot(StatusUsuario.EXCLUIDO, pageable).map { it.toResponse() }
 
     @Transactional
     fun atualizar(id: Long, request: ParticipantePatchRequest): ParticipanteResponse {
@@ -61,18 +66,42 @@ class ParticipanteService(
         return participante.toResponse()
     }
 
+    // Inativar bloqueia a conta (sem login, token recusado) e cancela as inscrições em aberto, que não
+    // voltam ao reativar. Repetir o status atual não muda nada.
     @Transactional
-    fun excluir(id: Long) {
-        if (!repository.existsById(id)) {
-            throw ResourceNotFoundException("Participante $id não encontrado")
+    fun alterarStatus(id: Long, request: AlterarStatusParticipanteRequest): ParticipanteResponse {
+        val novoStatus = requireNotNull(request.status) { "O status é obrigatório" }
+        require(novoStatus != StatusUsuario.EXCLUIDO) {
+            "Para excluir a conta, use DELETE /participantes/{id}"
         }
-        repository.deleteById(id)
+        val participante = obterComTrava(id)
+
+        if (novoStatus == StatusUsuario.INATIVO && participante.status == StatusUsuario.ATIVO) {
+            inscricaoService.cancelarEmAbertoDoParticipante(id)
+        }
+        participante.status = novoStatus
+        return participante.toResponse()
     }
 
+    // A linha não é apagada: as inscrições apontam para ela (a chave estrangeira impediria o DELETE).
+    // Os dados pessoais são apagados e a conta fica EXCLUIDO, o que, para a API, é o mesmo que não
+    // existir mais (404 em tudo e token recusado).
+    @Transactional
+    fun excluir(id: Long) {
+        val participante = obterComTrava(id)
+        inscricaoService.cancelarEmAbertoDoParticipante(id)
+        participante.anonimizar()
+    }
 
     private fun obter(id: Long): Participante =
-        repository.findByIdOrNull(id)
-            ?: throw ResourceNotFoundException("Participante $id não encontrado")
+        repository.findByIdOrNull(id)?.takeIf { it.status != StatusUsuario.EXCLUIDO }
+            ?: throw naoEncontrado(id)
+
+    private fun obterComTrava(id: Long): Participante =
+        repository.buscarComTrava(id)?.takeIf { it.status != StatusUsuario.EXCLUIDO }
+            ?: throw naoEncontrado(id)
+
+    private fun naoEncontrado(id: Long) = ResourceNotFoundException("Participante $id não encontrado")
 
     private companion object {
         const val EMAIL_EM_USO = "Já existe um cadastro com esse e-mail"

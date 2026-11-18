@@ -5,6 +5,7 @@ import acontece.api.enums.StatusInscricao
 import acontece.api.enums.StatusInscricao.CANCELADA
 import acontece.api.enums.StatusInscricao.CONFIRMADA
 import acontece.api.enums.StatusInscricao.PENDENTE
+import acontece.api.enums.StatusUsuario
 import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
 import acontece.api.modules.evento.Endereco
@@ -106,6 +107,48 @@ class InscricaoServiceTest {
             }
 
         assertEquals("Participante 999999 não encontrado", erro.message)
+    }
+
+    @Test
+    fun `participante inativo nao se inscreve`() {
+        val participante = novoParticipante().apply { status = StatusUsuario.INATIVO }
+        val evento = novoEvento()
+
+        val erro = assertFailsWith<ConflictException> { service.criar(pedido(participante, evento)) }
+
+        assertEquals("A conta do participante está inativa", erro.message)
+        assertEquals(0L, repository.count())
+    }
+
+    @Test
+    fun `participante excluido e tratado como inexistente`() {
+        val participante = novoParticipante().apply { anonimizar() }
+        val evento = novoEvento()
+
+        assertFailsWith<ResourceNotFoundException> { service.criar(pedido(participante, evento)) }
+    }
+
+    @Test
+    fun `cancelar em aberto do participante libera so as vagas de eventos que nao acabaram`() {
+        val ana = novoParticipante()
+        val bia = novoParticipante()
+        val futuro = novoEvento()
+        val outroFuturo = novoEvento()
+        val encerrado =
+            novoEvento(inicio = LocalDateTime.now().minusDays(2), fim = LocalDateTime.now().minusDays(1))
+        val pendente = inscrever(ana, futuro, PENDENTE)
+        val confirmada = inscrever(ana, outroFuturo, CONFIRMADA)
+        val historico = inscrever(ana, encerrado, CONFIRMADA)
+        val deOutro = inscrever(bia, futuro, PENDENTE)
+
+        val canceladas = service.cancelarEmAbertoDoParticipante(ana.id!!)
+        em.clear() // o UPDATE em lote vai direto ao banco; relê as inscrições de lá
+
+        assertEquals(2, canceladas)
+        assertEquals(CANCELADA, repository.findById(pendente.id!!).get().status)
+        assertEquals(CANCELADA, repository.findById(confirmada.id!!).get().status)
+        assertEquals(CONFIRMADA, repository.findById(historico.id!!).get().status)
+        assertEquals(PENDENTE, repository.findById(deOutro.id!!).get().status)
     }
 
     @Test

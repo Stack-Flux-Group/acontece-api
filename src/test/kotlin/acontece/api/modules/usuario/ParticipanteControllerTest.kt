@@ -3,6 +3,7 @@ package acontece.api.modules.usuario
 import acontece.api.comoOrganizador
 import acontece.api.comoParticipante
 import acontece.api.config.SecurityConfig
+import acontece.api.enums.StatusUsuario
 import acontece.api.exception.ResourceNotFoundException
 import org.junit.jupiter.api.Test
 import org.mockito.BDDMockito.given
@@ -33,6 +34,9 @@ class ParticipanteControllerTest {
     // A SecurityConfig exige um decoder; aqui o token já vem autenticado, então ele nunca é usado.
     @MockitoBean lateinit var jwtDecoder: JwtDecoder
 
+    // A SecurityConfig confere o status da conta no banco; com o token simulado do teste ela nem é chamada.
+    @MockitoBean lateinit var usuarios: UsuarioRepository
+
     private val participante =
         ParticipanteResponse(
             id = 1,
@@ -40,7 +44,65 @@ class ParticipanteControllerTest {
             email = "maria@email.com",
             cpf = "52998224725",
             telefone = "11999998888",
+            status = StatusUsuario.ATIVO,
         )
+
+    @Test
+    fun `PATCH status do participante pelo organizador devolve o participante`() {
+        given(service.alterarStatus(1L, AlterarStatusParticipanteRequest(StatusUsuario.INATIVO)))
+            .willReturn(participante.copy(status = StatusUsuario.INATIVO))
+
+        mockMvc
+            .perform(
+                patch("/participantes/1/status")
+                    .with(comoOrganizador())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"status": "INATIVO"}""")
+            )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("\$.status").value("INATIVO"))
+    }
+
+    @Test
+    fun `PATCH status e so do organizador, nem o proprio participante pode`() {
+        mockMvc
+            .perform(
+                patch("/participantes/1/status")
+                    .with(comoParticipante(1))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"status": "ATIVO"}""")
+            )
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `PATCH status sem status ou com valor desconhecido devolve 400`() {
+        mockMvc
+            .perform(
+                patch("/participantes/1/status")
+                    .with(comoOrganizador())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{}")
+            )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("\$.fieldErrors[0].field").value("status"))
+
+        mockMvc
+            .perform(
+                patch("/participantes/1/status")
+                    .with(comoOrganizador())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"status": "BLOQUEADO"}""")
+            )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `DELETE do proprio participante devolve 204`() {
+        mockMvc
+            .perform(delete("/participantes/1").with(comoParticipante(1)))
+            .andExpect(status().isNoContent)
+    }
 
     @Test
     fun `GET participantes por id devolve o participante`() {

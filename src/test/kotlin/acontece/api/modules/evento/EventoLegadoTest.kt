@@ -3,6 +3,7 @@ package acontece.api.modules.evento
 import acontece.api.comoOrganizador
 import acontece.api.comoParticipante
 import acontece.api.config.SecurityConfig
+import acontece.api.modules.usuario.UsuarioRepository
 import java.time.LocalDateTime
 import kotlin.test.Test
 import org.mockito.BDDMockito.given
@@ -31,6 +32,9 @@ class EventoLegadoTest {
     @MockitoBean lateinit var service: EventoService
 
     @MockitoBean lateinit var jwtDecoder: JwtDecoder
+
+    // A SecurityConfig confere o status da conta no banco; com o token simulado do teste ela nem é chamada.
+    @MockitoBean lateinit var usuarios: UsuarioRepository
 
     private val evento =
         EventoResponseDTO(

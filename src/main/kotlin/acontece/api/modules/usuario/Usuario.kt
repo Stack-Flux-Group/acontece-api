@@ -1,13 +1,17 @@
 package acontece.api.modules.usuario
 
 import acontece.api.enums.Papel
+import acontece.api.enums.StatusUsuario
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Inheritance
 import jakarta.persistence.InheritanceType
+import org.hibernate.annotations.ColumnDefault
 
 @Entity
 @Inheritance(strategy = InheritanceType.JOINED)
@@ -28,6 +32,13 @@ abstract class Usuario(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
+
+    // O DEFAULT faz o `ddl-auto=update` conseguir criar a coluna NOT NULL numa tabela que já tem
+    // linhas: as contas que já existiam entram como ATIVO.
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    @ColumnDefault("'ATIVO'")
+    var status: StatusUsuario = StatusUsuario.ATIVO
 
     // Vem da própria subclasse, então não vira coluna.
     abstract val papel: Papel
