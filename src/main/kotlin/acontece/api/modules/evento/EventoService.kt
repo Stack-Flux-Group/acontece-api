@@ -121,8 +121,7 @@ class EventoService(
         val endereco = buscarEndereco(dto.cep, dto.numero)
 
         // Daqui pra baixo é uma transação só: se algo falhar, nada é gravado.
-        val atualizado =
-            transacao.execute {
+        return transacao.execute {
                 // Trava a linha do evento: quem chegar agora espera a edição acabar,
                 // então a contagem abaixo não fica velha antes de gravar.
                 val evento =
@@ -145,7 +144,6 @@ class EventoService(
                 evento.fotoUrl = dto.fotoUrl
                 evento.toResponse(ocupadas) // o JPA grava as mudanças sozinho ao fim da transação
             }
-        return checkNotNull(atualizado)
     }
 
     @Transactional fun deletar(id: Long) = repository.delete(buscarEntidade(id))
