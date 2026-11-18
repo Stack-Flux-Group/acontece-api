@@ -5,6 +5,10 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import java.time.LocalDateTime
+import org.springdoc.core.annotations.ParameterObject
+import org.springframework.data.domain.Pageable
+import org.springframework.data.web.PageableDefault
+import org.springframework.data.web.PagedModel
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -41,16 +45,20 @@ class EventoController(
         return ResponseEntity.created(location).body(criado)
     }
 
-    // GET /eventos?titulo=semana&inicio=2026-11-01T00:00:00&fim=2026-12-31T23:59:59
+    // GET /eventos?titulo=semana&inicio=2026-11-01T00:00:00&fim=2026-12-31T23:59:59&page=0&size=20
     // Todos os filtros são opcionais e se somam. @DateTimeFormat converte o texto da URL em data.
+    // A resposta vem paginada no mesmo formato de /participantes e /inscricoes: {content, page}.
     @Operation(
         summary = "Listar e buscar eventos",
         description =
-            "Sem filtros, devolve todos. `titulo` busca por parte do título (sem diferenciar maiúsculas); " +
-                "`inicio` e `fim` filtram pela data de início do evento. Ordenado pela data de início.",
+            "Paginado (`page` começa em 0, `size` padrão 20 e máximo 100). Sem filtros, devolve todos. " +
+                "`titulo` busca por parte do título (sem diferenciar maiúsculas); `inicio` e `fim` filtram " +
+                "pela data de início do evento. Ordem padrão: data de início; `sort` aceita dataInicio, " +
+                "dataFim, titulo, vagas e id (ex.: `sort=titulo,desc`).",
     )
     @GetMapping
     fun listar(
+        @ParameterObject @PageableDefault(size = 20) pageable: Pageable,
         @Parameter(description = "Parte do título") @RequestParam(required = false) titulo: String?,
         @Parameter(description = "Começa a partir de (ex.: 2026-12-01T00:00:00)")
         @RequestParam(required = false)
@@ -60,7 +68,7 @@ class EventoController(
         @RequestParam(required = false)
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
         fim: LocalDateTime?,
-    ): List<EventoResponseDTO> = service.buscar(titulo, inicio, fim)
+    ): PagedModel<EventoResponseDTO> = PagedModel(service.buscar(titulo, inicio, fim, pageable))
 
     @Operation(summary = "Buscar evento por ID")
     @GetMapping("/{id}")

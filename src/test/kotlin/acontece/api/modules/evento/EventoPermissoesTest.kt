@@ -4,6 +4,9 @@ import acontece.api.comoOrganizador
 import acontece.api.comoParticipante
 import acontece.api.config.SecurityConfig
 import kotlin.test.Test
+import org.mockito.BDDMockito.given
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageRequest
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
@@ -36,6 +39,9 @@ class EventoPermissoesTest {
 
     @Test
     fun `participante lista e busca eventos`() {
+        // Sem parâmetros, o controller pede a primeira página com 20 itens.
+        given(service.buscar(null, null, null, PageRequest.of(0, 20))).willReturn(Page.empty())
+
         mockMvc.perform(get("/eventos").with(comoParticipante())).andExpect(status().isOk)
         mockMvc.perform(get("/eventos/1").with(comoParticipante())).andExpect(status().isOk)
     }

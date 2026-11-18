@@ -10,10 +10,14 @@ import org.mockito.BDDMockito.given
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -104,6 +108,20 @@ class EventoValidacaoTest {
         criar(corpo())
             .andExpect(status().isBadGateway)
             .andExpect(jsonPath("\$.message").value("Não foi possível consultar o CEP agora. Tente novamente."))
+    }
+
+    @Test
+    fun `listagem vem paginada e limita o tamanho da pagina a 100`() {
+        // Pediu 500 por página: o Spring reduz para o máximo configurado antes de chegar ao service.
+        val pedido = PageRequest.of(0, 100, Sort.by("titulo"))
+        given(service.buscar(null, null, null, pedido)).willReturn(PageImpl(listOf(criado), pedido, 1))
+
+        mockMvc
+            .perform(get("/eventos").param("size", "500").param("sort", "titulo").with(comoOrganizador()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("\$.content[0].id").value(1))
+            .andExpect(jsonPath("\$.page.size").value(100))
+            .andExpect(jsonPath("\$.page.totalElements").value(1))
     }
 
     @Test
