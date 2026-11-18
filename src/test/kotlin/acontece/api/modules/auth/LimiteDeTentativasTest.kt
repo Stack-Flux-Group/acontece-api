@@ -1,5 +1,6 @@
 package acontece.api.modules.auth
 
+import acontece.api.notificacao.TelegramNotificador
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -8,6 +9,7 @@ import java.time.ZoneOffset
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.springframework.context.ApplicationEventPublisher
 
 class LimiteDeTentativasTest {
 
@@ -19,7 +21,14 @@ class LimiteDeTentativasTest {
     }
 
     private val relogio = RelogioManual(Instant.parse("2026-11-17T12:00:00Z"))
-    private val limite = LimiteDeTentativas(relogio, maxFalhas = 3, bloqueioMinutos = 15)
+    // Publisher vazio: o alerta de bloqueio é publicado, mas ninguém escuta neste teste.
+    private val limite =
+        LimiteDeTentativas(
+            relogio,
+            maxFalhas = 3,
+            bloqueioMinutos = 15,
+            TelegramNotificador(ApplicationEventPublisher {}),
+        )
 
     private fun errar(vezes: Int, ip: String = "1.1.1.1", email: String = "ana@email.com") =
         repeat(vezes) { limite.registrarFalha(ip, email) }

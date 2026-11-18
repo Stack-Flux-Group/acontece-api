@@ -1,5 +1,6 @@
 package acontece.api.modules.auth
 
+import acontece.api.notificacao.TelegramNotificador
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -20,6 +21,7 @@ class LimiteDeTentativas(
     private val clock: Clock,
     @Value("\${login.max-falhas:5}") private val maxFalhas: Int,
     @Value("\${login.bloqueio-minutos:15}") bloqueioMinutos: Long,
+    private val notificador: TelegramNotificador,
 ) {
 
     private val janela: Duration = Duration.ofMinutes(bloqueioMinutos)
@@ -44,11 +46,16 @@ class LimiteDeTentativas(
 
     fun registrarFalha(ip: String, email: String) {
         val agora = clock.instant()
-        registros.compute(chave(ip, email)) { _, atual ->
-            if (atual == null || !agora.isBefore(atual.inicio.plus(janela))) Registro(1, agora)
-            else atual.copy(falhas = atual.falhas + 1)
-        }
+        val registro =
+            registros.compute(chave(ip, email)) { _, atual ->
+                if (atual == null || !agora.isBefore(atual.inicio.plus(janela))) Registro(1, agora)
+                else atual.copy(falhas = atual.falhas + 1)
+            }
         limparVencidos(agora)
+        // Só na transição para o limite: falhas seguintes na mesma janela não alertam de novo.
+        if (registro != null && registro.falhas == maxFalhas) {
+            notificador.loginBloqueado(email, ip, janela.toMinutes())
+        }
     }
 
     // Login certo zera o histórico da dupla.

@@ -43,6 +43,19 @@ class TelegramNotificador(private val publicador: ApplicationEventPublisher) {
             """.trimIndent()
         )
 
+    // Disparado só na transição para o limite: as falhas seguintes na mesma janela
+    // de bloqueio não alertam de novo.
+    fun loginBloqueado(email: String, ip: String, minutosBloqueio: Long) =
+        publicar(
+            """
+            Alerta de segurança — acesso bloqueado:
+            • E-mail: $email
+            • IP: $ip
+            • Motivo: tentativas demais de senha errada
+            • Bloqueio: $minutosBloqueio min
+            """.trimIndent()
+        )
+
     private fun publicar(texto: String) = publicador.publishEvent(AlertaTelegram(texto))
 
     private companion object {
