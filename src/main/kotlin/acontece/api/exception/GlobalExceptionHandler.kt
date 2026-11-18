@@ -1,8 +1,10 @@
 package acontece.api.exception
 
+import acontece.api.modules.auth.LoginBloqueadoException
 import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.LoggerFactory
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
@@ -103,6 +105,18 @@ class GlobalExceptionHandler {
         request: HttpServletRequest,
     ): ResponseEntity<acontece.api.exception.ApiErrorResponse> =
         build(HttpStatus.UNAUTHORIZED, ex.message ?: "Credenciais inválidas", request)
+
+    // 429 - errou a senha vezes demais; Retry-After diz em quantos segundos pode tentar de novo
+    @ExceptionHandler(LoginBloqueadoException::class)
+    fun handleLoginBloqueado(
+        ex: LoginBloqueadoException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiErrorResponse> {
+        val corpo = build(HttpStatus.TOO_MANY_REQUESTS, ex.message ?: "Muitas tentativas", request).body
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(HttpHeaders.RETRY_AFTER, ex.segundosParaTentarDeNovo.toString())
+            .body(corpo)
+    }
 
     // 403 - logado, mas sem permissão (@PreAuthorize ou checagem de dono). Sem este handler, o
     // handler genérico abaixo o transformaria em 500.
