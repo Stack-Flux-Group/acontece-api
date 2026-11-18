@@ -6,6 +6,7 @@ import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
 import acontece.api.modules.evento.EventoRepository
 import acontece.api.modules.usuario.ParticipanteRepository
+import acontece.api.notificacao.TelegramNotificador
 import java.time.Clock
 import java.time.LocalDateTime
 import org.springframework.data.domain.Page
@@ -21,6 +22,7 @@ class InscricaoService(
     private val eventoRepository: EventoRepository,
     private val participanteRepository: ParticipanteRepository,
     private val clock: Clock,
+    private val notificador: TelegramNotificador,
 ) {
 
     @Transactional
@@ -62,9 +64,12 @@ class InscricaoService(
             throw ConflictException("Evento sem vagas disponíveis")
         }
 
-        return repository
-            .save(Inscricao(participante = participante, evento = evento, dataInscricao = agora))
-            .toResponse()
+        val resposta =
+            repository
+                .save(Inscricao(participante = participante, evento = evento, dataInscricao = agora))
+                .toResponse()
+        notificador.inscricaoCriada(resposta.participanteNome, resposta.eventoTitulo)
+        return resposta
     }
 
     @Transactional(readOnly = true)
@@ -94,7 +99,9 @@ class InscricaoService(
         }
 
         inscricao.status = novoStatus // JPA grava sozinho ao fim da transação
-        return inscricao.toResponse()
+        val resposta = inscricao.toResponse()
+        notificador.inscricaoStatus(resposta.participanteNome, resposta.eventoTitulo, novoStatus)
+        return resposta
     }
 
     // O participante desiste: a inscrição vira CANCELADA e a vaga volta para o evento.
@@ -115,7 +122,9 @@ class InscricaoService(
         require(inscricao.evento.dataFim.isAfter(LocalDateTime.now(clock))) { "O evento já foi encerrado" }
 
         inscricao.status = StatusInscricao.CANCELADA
-        return inscricao.toResponse()
+        val resposta = inscricao.toResponse()
+        notificador.inscricaoStatus(resposta.participanteNome, resposta.eventoTitulo, StatusInscricao.CANCELADA)
+        return resposta
     }
 
     // Chamado ao inativar ou excluir a conta: libera as vagas que o participante ainda ocupava.

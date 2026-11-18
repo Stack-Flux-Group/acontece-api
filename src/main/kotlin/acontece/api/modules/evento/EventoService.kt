@@ -6,6 +6,7 @@ import acontece.api.exception.ConflictException
 import acontece.api.exception.ResourceNotFoundException
 import acontece.api.exception.ServicoExternoException
 import acontece.api.modules.inscricao.InscricaoRepository
+import acontece.api.notificacao.TelegramNotificador
 import feign.FeignException
 import java.time.LocalDateTime
 import org.springframework.data.domain.Page
@@ -25,6 +26,7 @@ class EventoService(
     private val inscricaoRepository: InscricaoRepository,
     // Abre transação só onde precisa (ver atualizar).
     private val transacao: TransactionTemplate,
+    private val notificador: TelegramNotificador,
 ) {
 
     // Leitura
@@ -113,7 +115,9 @@ class EventoService(
                 fotoUrl = dto.fotoUrl,
             )
         // Evento novo não tem inscrição: todas as vagas livres.
-        return repository.save(evento).toResponse(vagasOcupadas = 0) // o save abre e fecha a própria transação
+        val resposta = repository.save(evento).toResponse(vagasOcupadas = 0) // o save abre e fecha a própria transação
+        notificador.eventoCriado(dto.titulo, inicio, dto.vagas)
+        return resposta
     }
 
     fun atualizar(id: Long, dto: EventoRequestDTO): EventoResponseDTO {
@@ -142,6 +146,7 @@ class EventoService(
                 evento.vagas = dto.vagas
                 evento.endereco = endereco
                 evento.fotoUrl = dto.fotoUrl
+                notificador.eventoAtualizado(dto.titulo)
                 evento.toResponse(ocupadas) // o JPA grava as mudanças sozinho ao fim da transação
             }
     }
