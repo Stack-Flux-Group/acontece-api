@@ -17,9 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
-// ROTAS ANTIGAS (obsoletas). O app publicado ainda chama estes caminhos, então eles continuam
-// respondendo exatamente como antes. Código novo deve usar /eventos (EventoController).
-// Quando o front migrar, esta classe inteira pode ser apagada.
+// ROTAS ANTIGAS (obsoletas). O app publicado ainda chama estes caminhos, então elas
+// continuam respondendo igual antes. Código novo usa /eventos (EventoController).
+// Quando o front migrar, pode apagar esta classe inteira.
 @Tag(name = "Eventos (rotas antigas)", description = "Obsoletas: use /eventos. Mantidas só para o app atual.")
 @RestController
 @RequestMapping("/evento")

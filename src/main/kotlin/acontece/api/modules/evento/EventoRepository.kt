@@ -8,17 +8,12 @@ import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
-// Query derivada: serve para buscas simples. É só seguir o padrão de nome que o Spring monta a
-// consulta.
-// @Query: serve quando a consulta é mais complexa ou você quer controlar exatamente o que é
-// executado.
-
-// JpaSpecificationExecutor: permite montar a consulta a partir dos filtros que vierem (ver
-// EventoFiltros), em vez de uma query para cada combinação.
+// Query derivada: o Spring monta a consulta pelo nome do método.
+// @Query: quando a consulta é complicada e quer escrever na mão.
+// JpaSpecificationExecutor: monta o WHERE com os filtros que vierem (ver EventoFiltros).
 interface EventoRepository : JpaRepository<Evento, Long>, JpaSpecificationExecutor<Evento> {
 
-    // Query method - Spring Data JPA vai gerar a implementação automaticamente
-    // findBy + Titulo + Containing (LIKE %valor%) + IgnoreCase (case-insensitive)
+    // Nome vira consulta: findBy + Titulo + Containing (LIKE %valor%) + IgnoreCase
     fun findByTituloContainingIgnoreCase(titulo: String): List<Evento>
 
     @Query(
@@ -33,9 +28,9 @@ interface EventoRepository : JpaRepository<Evento, Long>, JpaSpecificationExecut
         @Param("fim") fim: LocalDateTime,
     ): List<Evento>
 
-    // Busca o evento travando a linha no banco (SELECT ... FOR UPDATE) até o fim da transação.
-    // Inscrições no mesmo evento e a edição das vagas esperam a sua vez, então a contagem de vagas
-    // nunca é lida por dois pedidos ao mesmo tempo. Só funciona dentro de uma transação.
+    // Trava a linha do evento no banco (SELECT ... FOR UPDATE) até a transação acabar.
+    // Quem chegar junto espera a vez, então a contagem de vagas não é lida por dois
+    // pedidos ao mesmo tempo. Só funciona dentro de uma transação.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT e FROM Evento e WHERE e.id = :id")
     fun buscarComTrava(@Param("id") id: Long): Evento?

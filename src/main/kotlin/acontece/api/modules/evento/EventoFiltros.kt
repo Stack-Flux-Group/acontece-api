@@ -4,15 +4,15 @@ import jakarta.persistence.criteria.Predicate
 import java.time.LocalDateTime
 import org.springframework.data.jpa.domain.Specification
 
-// Monta o WHERE da busca de eventos só com os filtros que vieram preenchidos.
+// Monta o WHERE da busca só com os filtros preenchidos.
 object EventoFiltros {
 
     fun de(titulo: String?, inicio: LocalDateTime?, fim: LocalDateTime?): Specification<Evento> =
         Specification { root, _, cb ->
             val condicoes = mutableListOf<Predicate>()
 
-            // Título contém o texto, sem diferenciar maiúsculas. % e _ digitados pelo usuário
-            // são escapados para valerem como texto, e não como curinga do LIKE.
+            // Título contém o texto, sem diferenciar maiúsculas. % e _ digitados são
+            // escapados para valer como texto, não como curinga do LIKE.
             titulo?.trim()?.takeIf { it.isNotEmpty() }?.let { texto ->
                 val escapado =
                     texto.lowercase().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

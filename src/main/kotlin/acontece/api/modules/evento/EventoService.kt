@@ -21,9 +21,9 @@ import org.springframework.transaction.support.TransactionTemplate
 class EventoService(
     private val repository: EventoRepository,
     private val viaCepClient: ViaCepClient,
-    // Para contar as inscrições ativas antes de reduzir as vagas.
+    // Para contar as inscrições ativas antes de diminuir as vagas.
     private val inscricaoRepository: InscricaoRepository,
-    // Abre uma transação só no trecho que precisa dela (ver atualizar).
+    // Abre transação só onde precisa (ver atualizar).
     private val transacao: TransactionTemplate,
 ) {
 
@@ -40,15 +40,15 @@ class EventoService(
         respostas(repository.findByTituloContainingIgnoreCase(titulo))
 
     fun buscarPorPeriodo(inicio: LocalDateTime, fim: LocalDateTime): List<EventoResponseDTO> {
-        // require: se a condição for falsa, lança illegalargumentexception com 400
+        // require: se a condição for falsa, vira erro 400
         require(!fim.isBefore(inicio)) {
             "A data final do filtro deve ser igual ou posterior à inicial"
         }
         return respostas(repository.buscarPorPeriodo(inicio, fim))
     }
 
-    // Busca de GET /eventos: cada filtro é opcional e os que vierem se somam (E).
-    // Sem filtro nenhum, devolve todos, uma página por vez.
+    // Busca do GET /eventos: cada filtro é opcional e eles se somam.
+    // Sem filtro, devolve todos paginado.
     fun buscar(
         titulo: String?,
         inicio: LocalDateTime?,
@@ -65,14 +65,13 @@ class EventoService(
         return pagina.map { it.toResponse(ocupadas[it.id] ?: 0) }
     }
 
-    // Monta a resposta de vários eventos com uma consulta de contagem só, seja qual for o tamanho
-    // da lista (em vez de uma por evento).
+    // Conta as inscrições de todos os eventos numa consulta só, em vez de uma por evento.
     private fun respostas(eventos: List<Evento>): List<EventoResponseDTO> {
         val ocupadas = ocupadasPorEvento(eventos)
         return eventos.map { it.toResponse(ocupadas[it.id] ?: 0) }
     }
 
-    // id do evento -> inscrições que ocupam vaga. Eventos sem inscrição ativa ficam de fora (0).
+    // id do evento -> inscrições que ocupam vaga. Sem inscrição ativa, nem aparece no mapa.
     private fun ocupadasPorEvento(eventos: List<Evento>): Map<Long, Long> {
         if (eventos.isEmpty()) return emptyMap() // "IN ()" vazio nem chega ao banco
         return inscricaoRepository
@@ -83,9 +82,9 @@ class EventoService(
     private fun ocupadas(eventoId: Long): Long =
         inscricaoRepository.countByEventoIdAndStatusIn(eventoId, StatusInscricao.QUE_OCUPAM_VAGA)
 
-    // Só deixa ordenar pelos campos conhecidos: um `sort=xyz` qualquer viraria erro 500 no banco,
-    // aqui vira 400 com a lista do que é aceito. O id entra por último como desempate, para a mesma
-    // linha nunca aparecer em duas páginas quando várias têm o mesmo valor no campo ordenado.
+    // Só aceita ordenar pelos campos conhecidos: `sort=xyz` viraria erro 500 no banco,
+    // aqui vira 400. O id entra por último como desempate, senão a mesma linha pode
+    // aparecer em duas páginas.
     private fun comOrdemValida(pageable: Pageable): Pageable {
         val invalidos = pageable.sort.map { it.property }.filter { it !in CAMPOS_ORDENAVEIS }.toList()
         require(invalidos.isEmpty()) {
@@ -97,8 +96,8 @@ class EventoService(
     }
 
     // Escrita
-    // criar e atualizar NÃO são @Transactional: o ViaCEP é consultado antes de abrir a transação,
-    // para não segurar uma conexão do banco (o pool tem só 3) enquanto espera a internet.
+    // criar e atualizar NÃO são @Transactional: o ViaCEP é chamado antes de abrir a transação,
+    // para não segurar conexão do banco (o pool tem só 3) esperando a internet.
 
     fun criar(dto: EventoRequestDTO): EventoResponseDTO {
         val (inicio, fim) = validarDatas(dto)
@@ -113,7 +112,7 @@ class EventoService(
                 endereco = endereco,
                 fotoUrl = dto.fotoUrl,
             )
-        // Evento recém-criado não tem inscrições: todas as vagas estão disponíveis.
+        // Evento novo não tem inscrição: todas as vagas livres.
         return repository.save(evento).toResponse(vagasOcupadas = 0) // o save abre e fecha a própria transação
     }
 
@@ -121,11 +120,11 @@ class EventoService(
         val (inicio, fim) = validarDatas(dto)
         val endereco = buscarEndereco(dto.cep, dto.numero)
 
-        // Daqui para baixo é uma transação só: se algo falhar no meio, nada é gravado.
+        // Daqui pra baixo é uma transação só: se algo falhar, nada é gravado.
         val atualizado =
             transacao.execute {
-                // Trava a linha do evento: uma inscrição que chegue agora espera esta edição
-                // terminar, então a contagem abaixo não fica velha antes de gravar.
+                // Trava a linha do evento: quem chegar agora espera a edição acabar,
+                // então a contagem abaixo não fica velha antes de gravar.
                 val evento =
                     repository.buscarComTrava(id)
                         ?: throw ResourceNotFoundException("Evento com id $id não encontrado")
@@ -153,13 +152,13 @@ class EventoService(
 
     // Funções auxiliares (privadas)
 
-    // Busca entidade ou lança 404 reaproveitada nas outras operações
+    // Busca ou devolve 404; usada pelas outras operações
     private fun buscarEntidade(id: Long): Evento =
         repository.findByIdOrNull(id)
             ?: throw ResourceNotFoundException("Evento com id $id não encontrado")
 
-    // Data de fim tem que ser depois da data de início -> senão 400. Devolve as duas já sem null:
-    // o @Valid do controller barra datas ausentes; o requireNotNull cobre quem chama o service direto.
+    // Data de fim tem que ser depois do início, senão 400. Devolve as duas sem null:
+    // o @Valid do controller barra data faltando; o requireNotNull cobre chamada direta.
     private fun validarDatas(dto: EventoRequestDTO): Pair<LocalDateTime, LocalDateTime> {
         val inicio = requireNotNull(dto.dataInicio) { "A data de início é obrigatória" }
         val fim = requireNotNull(dto.dataFim) { "A data de fim é obrigatória" }
@@ -167,18 +166,18 @@ class EventoService(
         return inicio to fim
     }
 
-    // Chama ViaCEP e transforma a resposta no Endereco da entidade
+    // Chama o ViaCEP e monta o Endereco da entidade
     private fun buscarEndereco(cep: String, numero: String?): Endereco {
-        val cepLimpo = cep.replace("-", "") // ViaCEP espera só números
+        val cepLimpo = cep.replace("-", "") // ViaCEP só aceita números
         val resposta =
             try {
                 viaCepClient.buscarCep(cepLimpo)
             } catch (ex: FeignException) {
-                // Fora do ar, erro do lado deles ou passou do timeout -> 502
+                // Fora do ar, erro deles ou timeout -> 502
                 throw ServicoExternoException("Não foi possível consultar o CEP agora. Tente novamente.", ex)
             }
 
-        // CEP com formato certo, mas inexistente -> ViaCEP devolve {"erro": true}
+        // CEP no formato certo mas que não existe -> ViaCEP devolve {"erro": true}
         require(resposta.erro != true) { "CEP $cep não encontrado" }
 
         return Endereco(
@@ -192,7 +191,7 @@ class EventoService(
     }
 
     private companion object {
-        // Campos aceitos em `sort` na listagem de eventos.
+        // Campos que o `sort` aceita na listagem.
         val CAMPOS_ORDENAVEIS = listOf("dataInicio", "dataFim", "titulo", "vagas", "id")
     }
 }

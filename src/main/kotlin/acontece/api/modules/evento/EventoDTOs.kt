@@ -7,12 +7,11 @@ import jakarta.validation.constraints.Positive
 import jakarta.validation.constraints.Size
 import java.time.LocalDateTime
 
-// @field: validação no campo da classe, onde o Bean Validation procura.
-// Sem isso, em Kotlin a validação pode ser ignorada.
+// @field: põe a validação no campo, que é onde o Bean Validation olha. Sem isso ela passa batido.
 // @NotBlank recusa null, "" e " ".
-// @NotNull Números e datas
+// @NotNull é para números e datas.
 // @Positive exige valor maior que zero.
-// Datas chegam no JSON neste formato: "2026-12-01T19:00:00"
+// Datas chegam no JSON assim: "2026-12-01T19:00:00"
 
 // O que o cliente envia (POST / PUT)
 // Todo campo tem valor padrão: se faltar no JSON, quem reclama é a validação (400 com o nome do
@@ -34,7 +33,7 @@ data class EventoRequestDTO(
     val fotoUrl: String? = null,
 )
 
-// O que a API devolver
+// O que a API devolve
 data class EventoResponseDTO(
     val id: Long,
     val titulo: String,
@@ -42,16 +41,14 @@ data class EventoResponseDTO(
     val dataInicio: LocalDateTime,
     val dataFim: LocalDateTime,
     val vagas: Int,
-    // Vagas que ainda podem ser ocupadas: vagas menos as inscrições PENDENTE e CONFIRMADA.
-    // Zero quer dizer evento lotado.
+    // Vagas menos inscrições PENDENTE e CONFIRMADA. Zero = evento lotado.
     val vagasDisponiveis: Int,
     val endereco: Endereco,
     val fotoUrl: String?,
 )
 
-// Função de extensão: permite escrever evento.toResponse(ocupadas)
-// em vez de montar o DTO na mão toda vez. `vagasOcupadas` vem do EventoService, que conta as
-// inscrições ativas (o Evento não conhece as próprias inscrições).
+// Função de extensão: escreve evento.toResponse(ocupadas) em vez de montar o DTO na mão.
+// `vagasOcupadas` vem do EventoService (o Evento não enxerga as próprias inscrições).
 fun Evento.toResponse(vagasOcupadas: Long) =
     EventoResponseDTO(
         id = id!!, // depois de salvo, o id nunca é null
@@ -60,7 +57,7 @@ fun Evento.toResponse(vagasOcupadas: Long) =
         dataInicio = dataInicio,
         dataFim = dataFim,
         vagas = vagas,
-        // Nunca negativo, mesmo que algum dado antigo tenha mais inscrições do que vagas.
+        // Nunca negativo, mesmo que dado antigo tenha mais inscrições que vagas.
         vagasDisponiveis = (vagas - vagasOcupadas).coerceAtLeast(0).toInt(),
         endereco = endereco,
         fotoUrl = fotoUrl,

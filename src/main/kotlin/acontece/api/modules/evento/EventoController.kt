@@ -24,9 +24,9 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder
 
-// Funções: Recebe requisição / Chama o Service / Devolve resposta
-// Rotas no padrão REST, iguais às de /participantes e /inscricoes: o recurso no plural e o verbo
-// HTTP dizendo a ação (POST cria, GET lê, PUT substitui, DELETE apaga).
+// O controller só recebe a requisição, chama o service e devolve a resposta.
+// Mesmo padrão de /participantes e /inscricoes: recurso no plural e o verbo HTTP
+// dizendo a ação (POST cria, GET lê, PUT substitui, DELETE apaga).
 @Tag(name = "Eventos", description = "Qualquer usuário logado consulta; só o organizador administra")
 @RestController
 @RequestMapping("/eventos")
@@ -34,8 +34,8 @@ class EventoController(
     private val service: EventoService // spring injeta o service sozinho
 ) {
 
-    // POST /eventos -> 201 Created, com o endereço do evento novo no cabeçalho Location.
-    // @Valid dispara as validações do DTO (@NotBlank, @Pattern...)
+    // POST /eventos -> 201, com o link do evento novo no header Location.
+    // @Valid roda as validações do DTO (@NotBlank, @Pattern...)
     @Operation(summary = "Criar evento", description = "Somente organizador. O endereço é preenchido pelo CEP.")
     @PostMapping
     fun criar(@Valid @RequestBody dto: EventoRequestDTO): ResponseEntity<EventoResponseDTO> {
@@ -46,8 +46,8 @@ class EventoController(
     }
 
     // GET /eventos?titulo=semana&inicio=2026-11-01T00:00:00&fim=2026-12-31T23:59:59&page=0&size=20
-    // Todos os filtros são opcionais e se somam. @DateTimeFormat converte o texto da URL em data.
-    // A resposta vem paginada no mesmo formato de /participantes e /inscricoes: {content, page}.
+    // Filtros opcionais e se somam. @DateTimeFormat converte o texto da URL em data.
+    // Resposta paginada igual a /participantes e /inscricoes: {content, page}.
     @Operation(
         summary = "Listar e buscar eventos",
         description =
@@ -79,7 +79,7 @@ class EventoController(
     fun atualizar(@PathVariable id: Long, @Valid @RequestBody dto: EventoRequestDTO): EventoResponseDTO =
         service.atualizar(id, dto)
 
-    // 204 No Content: sucesso sem corpo de resposta
+    // 204: deu certo e não devolve nada no corpo
     @Operation(summary = "Apagar evento", description = "Somente organizador.")
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

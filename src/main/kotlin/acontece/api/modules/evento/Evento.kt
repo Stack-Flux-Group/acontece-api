@@ -3,7 +3,7 @@ package acontece.api.modules.evento
 import jakarta.persistence.*
 import java.time.LocalDateTime
 
-// @Entity diz ao JPA que a classe vira uma tabela.
+// @Entity: a classe vira uma tabela no banco.
 @Entity
 class Evento(
     @Column(nullable = false) var titulo: String,
@@ -14,7 +14,6 @@ class Evento(
     @Embedded var endereco: Endereco,
     @Column(length = 1000) var fotoUrl: String? = null,
 
-    // @Id @GeneratedValue(IDENTITY) faz o banco gerar o id. Ele é val e null ao criar, porque você
-    // nunca altera o id depois.
+    // O banco gera o id. É val e null ao criar porque nunca muda depois.
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY) val id: Long? = null,
 )
