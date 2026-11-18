@@ -6,6 +6,7 @@ import acontece.api.modules.evento.Evento
 import acontece.api.modules.evento.EventoRepository
 import acontece.api.modules.usuario.Participante
 import acontece.api.modules.usuario.ParticipanteRepository
+import acontece.api.notificacao.TelegramNotificador
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDateTime
@@ -15,6 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.context.ApplicationEventPublisher
 
 // As datas do evento são digitadas pelo organizador em horário de Brasília, sem fuso. O servidor
 // (ex.: Render) roda em UTC; por isso o service lê a hora de um Clock com fuso de São Paulo, e não
