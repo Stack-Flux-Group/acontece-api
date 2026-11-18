@@ -10,6 +10,7 @@ import java.time.LocalDateTime
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.repository.findByIdOrNull
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -87,6 +88,27 @@ class InscricaoService(
         }
 
         inscricao.status = novoStatus // JPA grava sozinho ao fim da transação
+        return inscricao.toResponse()
+    }
+
+    // O participante desiste: a inscrição vira CANCELADA e a vaga volta para o evento.
+    // Usa a mesma trava de atualizarStatus, então um cancelamento e uma confirmação do organizador
+    // ao mesmo tempo passam um de cada vez.
+    @Transactional
+    fun cancelarPeloParticipante(id: Long, participanteId: Long): InscricaoResponse {
+        val inscricao = obterParaAtualizar(id)
+
+        // Mesma regra do GET: só o dono mexe na própria inscrição.
+        if (inscricao.participante.id != participanteId) {
+            throw AccessDeniedException("Acesso negado a esta inscrição")
+        }
+        if (inscricao.status == StatusInscricao.CANCELADA) {
+            throw ConflictException("A inscrição já está cancelada")
+        }
+        // Depois que o evento acabou, a inscrição vira histórico (quem estava inscrito) e não muda mais.
+        require(inscricao.evento.dataFim.isAfter(LocalDateTime.now(clock))) { "O evento já foi encerrado" }
+
+        inscricao.status = StatusInscricao.CANCELADA
         return inscricao.toResponse()
     }
 

@@ -40,6 +40,8 @@ class SecurityConfig {
                     .requestMatchers("/eventos", "/eventos/**", "/evento/**").hasRole("ORGANIZADOR")
                     .requestMatchers(HttpMethod.POST, "/inscricoes").hasRole("PARTICIPANTE")
                     .requestMatchers(HttpMethod.PATCH, "/inscricoes/*/status").hasRole("ORGANIZADOR")
+                    // o participante cancela a própria inscrição (o service confere se é dele)
+                    .requestMatchers(HttpMethod.PATCH, "/inscricoes/*/cancelar").hasRole("PARTICIPANTE")
                     .anyRequest().authenticated()
             }
             .oauth2ResourceServer { it.jwt { jwt -> jwt.jwtAuthenticationConverter(conversor()) } }

@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
+import org.springframework.security.access.AccessDeniedException
 
 // @DataJpaTest + @Import: banco H2 em memória com o service real (nada de mock, nada de Supabase).
 // generate_statistics permite contar quantas consultas SQL o Hibernate executou.
@@ -313,5 +314,75 @@ class InscricaoServiceTest {
             }
 
         assertEquals("Inscrição 999999 não encontrada", erro.message)
+    }
+
+    @Test
+    fun `participante cancela a propria inscricao pendente ou confirmada`() {
+        val participante = novoParticipante()
+        val pendente = inscrever(participante, novoEvento(), PENDENTE)
+        val confirmada = inscrever(participante, novoEvento(), CONFIRMADA)
+
+        assertEquals(CANCELADA, service.cancelarPeloParticipante(pendente.id!!, participante.id!!).status)
+        assertEquals(CANCELADA, service.cancelarPeloParticipante(confirmada.id!!, participante.id!!).status)
+        em.flush()
+        em.clear()
+        assertEquals(CANCELADA, repository.findById(pendente.id!!).orElseThrow().status)
+    }
+
+    @Test
+    fun `cancelar libera a vaga para outro participante`() {
+        val evento = novoEvento(vagas = 1)
+        val quemDesiste = novoParticipante()
+        val inscricao = inscrever(quemDesiste, evento, CONFIRMADA)
+        val outro = novoParticipante()
+        assertFailsWith<ConflictException> { service.criar(pedido(outro, evento)) } // lotado
+
+        service.cancelarPeloParticipante(inscricao.id!!, quemDesiste.id!!)
+
+        assertEquals(PENDENTE, service.criar(pedido(outro, evento)).status)
+    }
+
+    @Test
+    fun `participante nao cancela inscricao de outro`() {
+        val dono = novoParticipante()
+        val inscricao = inscrever(dono, novoEvento(), PENDENTE)
+        val intruso = novoParticipante()
+
+        assertFailsWith<AccessDeniedException> {
+            service.cancelarPeloParticipante(inscricao.id!!, intruso.id!!)
+        }
+        em.clear()
+        assertEquals(PENDENTE, repository.findById(inscricao.id!!).orElseThrow().status)
+    }
+
+    @Test
+    fun `cancelar inscricao ja cancelada devolve conflito`() {
+        val participante = novoParticipante()
+        val inscricao = inscrever(participante, novoEvento(), CANCELADA)
+
+        val erro =
+            assertFailsWith<ConflictException> {
+                service.cancelarPeloParticipante(inscricao.id!!, participante.id!!)
+            }
+        assertEquals("A inscrição já está cancelada", erro.message)
+    }
+
+    @Test
+    fun `nao cancela inscricao de evento encerrado`() {
+        val participante = novoParticipante()
+        val evento =
+            novoEvento(inicio = LocalDateTime.now().minusDays(2), fim = LocalDateTime.now().minusDays(1))
+        val inscricao = inscrever(participante, evento, CONFIRMADA)
+
+        val erro =
+            assertFailsWith<IllegalArgumentException> {
+                service.cancelarPeloParticipante(inscricao.id!!, participante.id!!)
+            }
+        assertEquals("O evento já foi encerrado", erro.message)
+    }
+
+    @Test
+    fun `cancelar inscricao inexistente`() {
+        assertFailsWith<ResourceNotFoundException> { service.cancelarPeloParticipante(999999L, 1L) }
     }
 }
