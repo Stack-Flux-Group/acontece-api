@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -31,7 +32,7 @@ class EventoValidacaoTest {
 
     private fun criar(corpo: String) =
         mockMvc.perform(
-            post("/evento/criar")
+            post("/eventos")
                 .with(comoOrganizador())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(corpo)
@@ -82,6 +83,7 @@ class EventoValidacaoTest {
         criar(corpo())
             .andExpect(status().isCreated)
             .andExpect(jsonPath("\$.id").value(1))
+            .andExpect(header().string("Location", "http://localhost/eventos/1"))
     }
 
     @Test

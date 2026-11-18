@@ -28,7 +28,7 @@ class CorsTest {
 
     private fun preflight(origem: String) =
         mockMvc.perform(
-            options("/evento/listar/")
+            options("/eventos")
                 .header(HttpHeaders.ORIGIN, origem)
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET")
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "authorization")

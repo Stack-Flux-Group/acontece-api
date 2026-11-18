@@ -109,12 +109,12 @@ class FluxoDeLoginTest {
         val token = entrar("bia@email.com", "senha-forte-1")
 
         mockMvc
-            .perform(get("/evento/listar/").header(HttpHeaders.AUTHORIZATION, bearer(token)))
+            .perform(get("/eventos").header(HttpHeaders.AUTHORIZATION, bearer(token)))
             .andExpect(status().isOk)
 
         mockMvc
             .perform(
-                post("/evento/criar")
+                post("/eventos")
                     .header(HttpHeaders.AUTHORIZATION, bearer(token))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}")
@@ -159,7 +159,7 @@ class FluxoDeLoginTest {
             .perform(get("/participantes").header(HttpHeaders.AUTHORIZATION, bearer(token)))
             .andExpect(status().isOk)
         mockMvc
-            .perform(get("/evento/listar/").header(HttpHeaders.AUTHORIZATION, bearer(token)))
+            .perform(get("/eventos").header(HttpHeaders.AUTHORIZATION, bearer(token)))
             .andExpect(status().isOk)
     }
 
@@ -170,8 +170,8 @@ class FluxoDeLoginTest {
         val adulterado = token.dropLast(3) + "abc"
 
         mockMvc
-            .perform(get("/evento/listar/").header(HttpHeaders.AUTHORIZATION, bearer(adulterado)))
+            .perform(get("/eventos").header(HttpHeaders.AUTHORIZATION, bearer(adulterado)))
             .andExpect(status().isUnauthorized)
-        mockMvc.perform(get("/evento/listar/")).andExpect(status().isUnauthorized)
+        mockMvc.perform(get("/eventos")).andExpect(status().isUnauthorized)
     }
 }

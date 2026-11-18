@@ -1,0 +1,84 @@
+package acontece.api.modules.evento
+
+import java.time.LocalDateTime
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+
+// Os filtros de GET /eventos rodando contra um banco de verdade (H2), sem mock do repositório.
+@SpringBootTest(properties = ["spring.datasource.url=jdbc:h2:mem:eventosbusca;DB_CLOSE_DELAY=-1"])
+class EventoBuscaTest {
+
+    @Autowired lateinit var service: EventoService
+    @Autowired lateinit var eventos: EventoRepository
+
+    private fun salvar(titulo: String, inicio: LocalDateTime) =
+        eventos.save(
+            Evento(
+                titulo = titulo,
+                descricao = "",
+                dataInicio = inicio,
+                dataFim = inicio.plusHours(2),
+                vagas = 10,
+                endereco = Endereco("01001000", "Praça da Sé", "Sé", "São Paulo", "SP"),
+            )
+        )
+
+    private fun titulos(titulo: String? = null, inicio: LocalDateTime? = null, fim: LocalDateTime? = null) =
+        service.buscar(titulo, inicio, fim).map { it.titulo }
+
+    @BeforeTest
+    fun preparar() {
+        eventos.deleteAll()
+        // Salvos fora de ordem de data, para provar que a resposta vem ordenada.
+        salvar("Festival de Música", LocalDateTime.of(2030, 3, 10, 18, 0))
+        salvar("Semana de Tecnologia", LocalDateTime.of(2030, 1, 5, 9, 0))
+        salvar("Oficina 100% prática", LocalDateTime.of(2030, 2, 20, 14, 0))
+    }
+
+    @Test
+    fun `sem filtros devolve todos em ordem de data de inicio`() {
+        assertEquals(
+            listOf("Semana de Tecnologia", "Oficina 100% prática", "Festival de Música"),
+            titulos(),
+        )
+    }
+
+    @Test
+    fun `titulo busca por parte do texto sem diferenciar maiusculas`() {
+        assertEquals(listOf("Semana de Tecnologia"), titulos(titulo = "TECNO"))
+    }
+
+    @Test
+    fun `porcentagem no titulo vale como texto e nao como curinga`() {
+        assertEquals(listOf("Oficina 100% prática"), titulos(titulo = "100%"))
+        // Sem o escape, "%" casaria com todos os títulos; com ele, só com quem tem "%" no texto.
+        assertEquals(listOf("Oficina 100% prática"), titulos(titulo = "%"))
+    }
+
+    @Test
+    fun `periodo filtra pela data de inicio incluindo as pontas`() {
+        assertEquals(
+            listOf("Semana de Tecnologia", "Oficina 100% prática"),
+            titulos(inicio = LocalDateTime.of(2030, 1, 5, 9, 0), fim = LocalDateTime.of(2030, 2, 20, 14, 0)),
+        )
+    }
+
+    @Test
+    fun `filtros se somam`() {
+        assertEquals(
+            listOf("Festival de Música"),
+            titulos(titulo = "a", inicio = LocalDateTime.of(2030, 3, 1, 0, 0)),
+        )
+    }
+
+    @Test
+    fun `fim antes do inicio devolve erro de requisicao`() {
+        assertFailsWith<IllegalArgumentException> {
+            titulos(inicio = LocalDateTime.of(2030, 2, 1, 0, 0), fim = LocalDateTime.of(2030, 1, 1, 0, 0))
+        }
+    }
+}

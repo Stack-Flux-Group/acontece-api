@@ -35,8 +35,9 @@ class SecurityConfig {
                     .requestMatchers(HttpMethod.POST, "/participantes").permitAll()
                     .requestMatchers(HttpMethod.GET, "/participantes").hasRole("ORGANIZADOR")
                     // qualquer usuário logado vê eventos; só o organizador cria, edita e apaga
-                    .requestMatchers(HttpMethod.GET, "/evento/**").authenticated()
-                    .requestMatchers("/evento/**").hasRole("ORGANIZADOR")
+                    // (/evento/** são as rotas antigas, mantidas enquanto o app migra para /eventos)
+                    .requestMatchers(HttpMethod.GET, "/eventos", "/eventos/**", "/evento/**").authenticated()
+                    .requestMatchers("/eventos", "/eventos/**", "/evento/**").hasRole("ORGANIZADOR")
                     .requestMatchers(HttpMethod.POST, "/inscricoes").hasRole("PARTICIPANTE")
                     .requestMatchers(HttpMethod.PATCH, "/inscricoes/*/status").hasRole("ORGANIZADOR")
                     .anyRequest().authenticated()
