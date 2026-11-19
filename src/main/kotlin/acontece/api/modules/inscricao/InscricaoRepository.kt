@@ -12,7 +12,7 @@ import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
-// Uma linha do resultado de contarPorEvento: o Spring preenche pelos apelidos (AS) da consulta.
+// Cada linha do resultado de contarPorEvento: o Spring preenche pelos apelidos (AS) da consulta.
 interface OcupacaoDoEvento {
     val eventoId: Long
     val ocupadas: Long
@@ -20,12 +20,11 @@ interface OcupacaoDoEvento {
 
 interface InscricaoRepository : JpaRepository<Inscricao, Long> {
 
-    // Quantas inscrições do evento estão num dos status dados (usado para contar as que ocupam vaga)
+    // Quantas inscricoes do evento estao num dos status dados (usado pra contar as que ocupam vaga).
     fun countByEventoIdAndStatusIn(eventoId: Long, statuses: Collection<StatusInscricao>): Long
 
-    // A mesma contagem para vários eventos de uma vez (GROUP BY), usada nas listagens de eventos.
-    // Sem ela, cada evento da página dispararia a própria consulta de contagem.
-    // Evento sem nenhuma inscrição nos status dados não aparece no resultado.
+    // A mesma contagem pra varios eventos de uma vez (GROUP BY). Sem ela, cada evento da pagina
+    // faria a propria consulta. Evento sem inscricao nos status nao aparece no resultado.
     @Query(
         """
         SELECT i.evento.id AS eventoId, COUNT(i) AS ocupadas
@@ -45,17 +44,14 @@ interface InscricaoRepository : JpaRepository<Inscricao, Long> {
         statuses: Collection<StatusInscricao>,
     ): Boolean
 
-    // Busca a inscrição travando a linha (SELECT ... FOR UPDATE) até o fim da transação. Dois PATCH
-    // simultâneos na mesma inscrição passam um de cada vez, então a validação da transição sempre
-    // enxerga o status já gravado pelo anterior. Só funciona dentro de uma @Transactional.
+    // Busca a inscricao travando a linha (FOR UPDATE) ate o fim da transacao, entao dois PATCH
+    // juntos passam um de cada vez e a transicao sempre ve o status ja gravado. So funciona em @Transactional.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM Inscricao i WHERE i.id = :id")
     fun buscarParaAtualizar(@Param("id") id: Long): Inscricao?
 
-    // Cancela de uma vez as inscrições que ocupam vaga em eventos que ainda não acabaram (as de eventos
-    // encerrados ficam como histórico). Usado quando a conta do participante é inativada ou excluída.
-    // O evento vai por subconsulta porque UPDATE em JPQL não aceita JOIN. Sem clearAutomatically de
-    // propósito: limpar o contexto descartaria as mudanças que quem chamou ainda vai fazer no participante.
+    // Cancela as inscricoes que ocupam vaga em evento que ainda nao acabou (encerrado fica como historico).
+    // Sem clearAutomatico: limpar o contexto jogaria fora as mudancas que quem chamou ainda vai fazer.
     @Modifying(flushAutomatically = true)
     @Query(
         """
@@ -72,10 +68,8 @@ interface InscricaoRepository : JpaRepository<Inscricao, Long> {
         @Param("cancelada") cancelada: StatusInscricao,
     ): Int
 
-    // Cada filtro é ignorado quando vem nulo: "IS NULL OR ..." deixa a condição sempre verdadeira.
-    // @EntityGraph busca participante e evento no mesmo SELECT (JOIN). Sem ele, a resposta de cada
-    // linha dispararia mais duas consultas (participante e evento são LAZY), o que numa página de
-    // 20 inscrições seriam 41 idas ao banco. É seguro com paginação porque são relações *ToOne.
+    // Filtro nulo e ignorado ("IS NULL OR ..." deixa a condicao sempre verdadeira).
+    // @EntityGraph traz participante e evento no mesmo SELECT; sem ele cada linha faria +2 consultas.
     @EntityGraph(attributePaths = ["participante", "evento"])
     @Query(
         """

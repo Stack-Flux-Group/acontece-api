@@ -8,12 +8,12 @@ import java.util.concurrent.ConcurrentHashMap
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 
-// Freia quem tenta adivinhar senhas: depois de `maxFalhas` logins errados do mesmo IP para o mesmo
+// Freia quem tenta adivinhar senhas depois de `maxFalhas` logins errados do mesmo IP para o mesmo
 // e-mail, novas tentativas dessa dupla são recusadas (429) até a janela de bloqueio acabar.
-//
+
 // A chave é IP + e-mail, e não só o e-mail, para que um atacante não consiga bloquear a conta de
 // outra pessoa errando a senha dela de propósito: ele só bloqueia a si mesmo.
-//
+
 // Fica na memória da instância: reiniciar a aplicação zera os contadores, e com mais de uma
 // instância cada uma conta as suas. Para o tamanho atual do projeto isso basta.
 @Component

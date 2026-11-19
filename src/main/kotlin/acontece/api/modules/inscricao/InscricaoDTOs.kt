@@ -6,8 +6,7 @@ import java.time.LocalDateTime
 
 data class InscricaoRequest(
 
-    // Não vem do cliente: o controller preenche com o id do token, para ninguém se inscrever
-    // em nome de outro. Qualquer valor enviado no JSON é sobrescrito.
+    // Nao vem do cliente: o controller poe o id do token aqui, entao ninguem se inscreve em nome de outro.
     val participanteId: Long? = null,
 
     @field:NotNull(message = "O evento é obrigatório")

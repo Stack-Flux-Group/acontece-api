@@ -34,12 +34,13 @@ class InscricaoController(
         summary = "Inscrever-se em um evento",
         description = "Somente participante. A inscrição é sempre em nome de quem está logado; só o `eventoId` é enviado.",
     )
-    // Só participante se inscreve (regra na SecurityConfig), sempre em seu próprio nome.
+    // So participante se inscreve (regra na SecurityConfig), sempre em nome proprio.
     @PostMapping
     fun criar(
         @Valid @RequestBody request: InscricaoRequest,
         @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<InscricaoResponse> {
+        // O participanteId que veio no corpo e descartado: vale o id do token.
         val criada = service.criar(request.copy(participanteId = jwt.usuarioId))
         val location =
             ServletUriComponentsBuilder.fromCurrentRequest()
@@ -53,9 +54,11 @@ class InscricaoController(
         summary = "Buscar inscrição",
         description = "O participante só vê as próprias; o organizador vê todas.",
     )
+    // Participante so ve a propria; organizador ve todas.
     @GetMapping("/{id}")
     fun buscarPorId(@PathVariable id: Long, @AuthenticationPrincipal jwt: Jwt): InscricaoResponse {
         val inscricao = service.buscarPorId(id)
+        // Nao e organizador e nao e o dono? 403.
         if (!jwt.ehOrganizador && inscricao.participanteId != jwt.usuarioId) {
             throw AccessDeniedException("Acesso negado a esta inscrição")
         }
@@ -74,7 +77,7 @@ class InscricaoController(
         @PageableDefault(size = 20, sort = ["id"]) pageable: Pageable,
         @AuthenticationPrincipal jwt: Jwt,
     ): PagedModel<InscricaoResponse> {
-        // Participante é travado no próprio id, ignorando o filtro que mandou.
+        // Participante fica preso no proprio id; o filtro que ele mandar e ignorado.
         val doParticipante = if (jwt.ehOrganizador) participanteId else jwt.usuarioId
         return PagedModel(service.listar(eventoId, doParticipante, status, pageable))
     }
@@ -95,7 +98,7 @@ class InscricaoController(
             "Somente participante, e só a própria inscrição (403 se for de outro). Funciona com a inscrição " +
                 "PENDENTE ou CONFIRMADA; já cancelada dá 409 e evento encerrado dá 400. A vaga é liberada.",
     )
-    // Sem corpo: o novo status é sempre CANCELADA e quem pede é sempre o participante do token.
+    // Sem corpo: o status novo e sempre CANCELADA e quem pede e sempre o do token.
     @PatchMapping("/{id}/cancelar")
     fun cancelar(@PathVariable id: Long, @AuthenticationPrincipal jwt: Jwt): InscricaoResponse =
         service.cancelarPeloParticipante(id, jwt.usuarioId)

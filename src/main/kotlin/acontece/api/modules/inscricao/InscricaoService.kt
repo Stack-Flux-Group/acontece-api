@@ -27,12 +27,11 @@ class InscricaoService(
 
     @Transactional
     fun criar(request: InscricaoRequest): InscricaoResponse {
-        // O @Valid do controller já barra null; o requireNotNull cobre quem chama o service direto.
+        // O @Valid do controller ja barra null; esse require e so pra quem chamar o service direto.
         val participanteId = requireNotNull(request.participanteId) { "O participante é obrigatório" }
         val eventoId = requireNotNull(request.eventoId) { "O evento é obrigatório" }
 
-        // A trava no participante segura uma inativação/exclusão que chegue ao mesmo tempo: ou a
-        // inscrição entra antes (e a inativação a cancela), ou a conta já está inativa e ela é recusada.
+        // Trava a linha do participante pra uma exclusao nao passar no meio da inscricao.
         val participante =
             participanteRepository.buscarComTrava(participanteId)?.takeIf { it.status != StatusUsuario.EXCLUIDO }
                 ?: throw ResourceNotFoundException("Participante $participanteId não encontrado")
@@ -40,16 +39,17 @@ class InscricaoService(
             throw ConflictException("A conta do participante está inativa")
         }
 
-        // Aqui a linha do evento fica travada até o fim da transação: as checagens abaixo (duplicada
-        // e vagas) rodam uma inscrição de cada vez por evento, então ninguém passa do limite.
+        // Aqui a linha do evento fica travada ate o fim: as inscricoes entram uma de cada vez,
+        // entao duas requisicoes juntas nao passam do limite de vagas.
         val evento =
             eventoRepository.buscarComTrava(eventoId)
                 ?: throw ResourceNotFoundException("Evento $eventoId não encontrado")
 
-        // "Agora" vem do Clock (horário de São Paulo), o mesmo fuso em que o evento foi cadastrado.
+        // "Agora" vem do Clock (horario de Sao Paulo), o mesmo fuso em que o evento foi cadastrado.
         val agora = LocalDateTime.now(clock)
         require(evento.dataFim.isAfter(agora)) { "O evento já foi encerrado" }
 
+        // Ja inscrito nesse evento com status que ocupa vaga? Recusa.
         if (
             repository.existsByParticipanteIdAndEventoIdAndStatusIn(
                 participanteId,
@@ -75,8 +75,7 @@ class InscricaoService(
     @Transactional(readOnly = true)
     fun buscarPorId(id: Long): InscricaoResponse = obter(id).toResponse()
 
-    // O map { } roda aqui dentro, com a transação aberta, porque toResponse() lê participante e
-    // evento (LAZY).
+    // O map { } roda aqui dentro porque toResponse() le participante e evento (LAZY) com a transacao aberta.
     @Transactional(readOnly = true)
     fun listar(
         eventoId: Long?,
@@ -86,9 +85,7 @@ class InscricaoService(
     ): Page<InscricaoResponse> =
         repository.buscar(eventoId, participanteId, status, pageable).map { it.toResponse() }
 
-    // Confirmar ou cancelar nunca ocupa vaga nova (CANCELADA é final e reinscrever cria uma linha
-    // nova), mas a transição precisa ser atômica: sem a trava, dois PATCH simultâneos leriam o mesmo
-    // status e o último a gravar venceria, permitindo até CANCELADA → CONFIRMADA.
+    // A trava e pra dois PATCH juntos nao lerem o mesmo status: sem ela, um CANCELADA poderia virar CONFIRMADA.
     @Transactional
     fun atualizarStatus(id: Long, request: AtualizarStatusRequest): InscricaoResponse {
         val novoStatus = requireNotNull(request.status) { "O status é obrigatório" }
@@ -104,21 +101,20 @@ class InscricaoService(
         return resposta
     }
 
-    // O participante desiste: a inscrição vira CANCELADA e a vaga volta para o evento.
-    // Usa a mesma trava de atualizarStatus, então um cancelamento e uma confirmação do organizador
-    // ao mesmo tempo passam um de cada vez.
+    // O participante desistiu: vira CANCELADA e a vaga volta pro evento.
+    // Usa a mesma trava do atualizarStatus, entao cancelamento e confirmacao passam um de cada vez.
     @Transactional
     fun cancelarPeloParticipante(id: Long, participanteId: Long): InscricaoResponse {
         val inscricao = obterParaAtualizar(id)
 
-        // Mesma regra do GET: só o dono mexe na própria inscrição.
+        // So o dono mexe na propria inscricao.
         if (inscricao.participante.id != participanteId) {
             throw AccessDeniedException("Acesso negado a esta inscrição")
         }
         if (inscricao.status == StatusInscricao.CANCELADA) {
             throw ConflictException("A inscrição já está cancelada")
         }
-        // Depois que o evento acabou, a inscrição vira histórico (quem estava inscrito) e não muda mais.
+        // Evento encerrado? A inscricao vira historico e nao muda mais.
         require(inscricao.evento.dataFim.isAfter(LocalDateTime.now(clock))) { "O evento já foi encerrado" }
 
         inscricao.status = StatusInscricao.CANCELADA
@@ -127,8 +123,8 @@ class InscricaoService(
         return resposta
     }
 
-    // Chamado ao inativar ou excluir a conta: libera as vagas que o participante ainda ocupava.
-    // Roda dentro da transação de quem chamou, que já travou o participante.
+    // Roda quando a conta e inativada ou excluida: cancela as inscricoes que ainda ocupavam vaga.
+    // Ja esta dentro da transacao de quem chamou, que travou o participante.
     @Transactional
     fun cancelarEmAbertoDoParticipante(participanteId: Long): Int =
         repository.cancelarEmAbertoDoParticipante(
@@ -146,7 +142,7 @@ class InscricaoService(
             ?: throw ResourceNotFoundException("Inscrição $id não encontrada")
 
     private companion object {
-        // Para cada status atual, os status para os quais ele pode ir.
+        // Pra cada status, os status pra onde ele pode ir.
         val TRANSICOES =
             mapOf(
                 StatusInscricao.PENDENTE to
