@@ -13,21 +13,20 @@ import org.springframework.transaction.event.TransactionalEventListener
 @Component
 class AlertaTelegramListener(
     private val client: TelegramClient,
-    // Vazios = notificações desligadas; a API funciona normal sem o Telegram.
+    // Vazios = notificacao desligada; a API funciona normal sem Telegram.
     @Value("\${telegram.bot-token:}") private val botToken: String,
     @Value("\${telegram.chat-id:}") private val chatId: String,
 ) {
     private val log = LoggerFactory.getLogger(AlertaTelegramListener::class.java)
 
-    // AFTER_COMMIT: o alerta só sai se a operação gravou de verdade. @Async: a chamada
-    // HTTP roda em outra thread, então um Telegram lento não segura a resposta da API.
-    // fallbackExecution cobre quem publica sem transação aberta (ex.: save direto).
+    // AFTER_COMMIT: so avisa se gravou de verdade. @Async: o Telegram lento nao segura a resposta.
+    // fallbackExecution cobre quem publica sem transacao aberta.
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     fun enviar(alerta: AlertaTelegram) = enviarTexto(alerta.texto)
 
-    // Alerta de segurança: sai na hora, sem esperar commit — a transação de origem
-    // (ex.: login com senha errada) termina em rollback e AFTER_COMMIT o descartaria.
+    // Alerta de seguranca sai na hora: a transacao de origem (ex.: login errado) da rollback
+    // e AFTER_COMMIT jogaria o evento fora.
     @Async
     @EventListener
     fun enviarImediato(alerta: AlertaTelegramImediato) = enviarTexto(alerta.texto)

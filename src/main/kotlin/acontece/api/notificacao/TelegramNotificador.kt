@@ -6,7 +6,7 @@ import java.time.format.DateTimeFormatter
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 
-// Monta os textos dos alertas e publica o evento. Quem chama não espera o Telegram:
+// Monta o texto do alerta e solta o evento. Quem chama nao espera o Telegram:
 // o envio real acontece no AlertaTelegramListener, depois do commit.
 @Service
 class TelegramNotificador(private val publicador: ApplicationEventPublisher) {
@@ -32,8 +32,7 @@ class TelegramNotificador(private val publicador: ApplicationEventPublisher) {
             """.trimIndent()
         )
 
-    // A inativação é sempre pedida por um organizador (a rota PATCH /participantes/{id}/status
-    // é exclusiva dele), então a mensagem já diz quem agiu.
+    // So o organizador inativa conta, entao a mensagem ja diz quem agiu.
     fun contaInativada(nome: String, email: String) =
         publicar(
             """
@@ -53,7 +52,7 @@ class TelegramNotificador(private val publicador: ApplicationEventPublisher) {
             """.trimIndent()
         )
 
-    // A exclusão pode partir do próprio participante (DELETE com o próprio id) ou do organizador.
+    // A exclusao pode ser do proprio participante ou de um organizador.
     fun contaExcluida(nome: String, email: String, peloProprioParticipante: Boolean) =
         publicar(
             """
@@ -84,9 +83,8 @@ class TelegramNotificador(private val publicador: ApplicationEventPublisher) {
             """.trimIndent()
         )
 
-    // Disparado só na transição para o limite: as falhas seguintes na mesma janela
-    // de bloqueio não alertam de novo. Vai pelo evento imediato porque quem publica está
-    // numa transação que termina em exceção (rollback) — AFTER_COMMIT nunca entregaria.
+    // So alerta na virada pro limite: as falhas seguintes na mesma janela nao repetem.
+    // Vai pelo evento imediato porque quem publica termina em excecao (rollback) e AFTER_COMMIT nunca entregaria.
     fun loginBloqueado(email: String, ip: String, minutosBloqueio: Long) =
         publicador.publishEvent(
             AlertaTelegramImediato(
