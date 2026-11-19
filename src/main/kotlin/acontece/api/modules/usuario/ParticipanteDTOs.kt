@@ -25,7 +25,7 @@ data class ParticipanteRequest(
     @field:Pattern(regexp = """^\d{10,11}$""", message = "O telefone deve ter 10 ou 11 digitos, somente numeros")
     val telefone: String? = null,
 
-    // BCrypt só lê os primeiros 72 bytes, por isso o teto.
+    // BCrypt so le os primeiros 72 bytes, por isso o teto de 72 na senha.
     @field:NotBlank(message = "A senha é obrigatória")
     @field:Size(min = 8, max = 72, message = "A senha deve ter entre 8 e 72 caracteres")
     val senha: String = "",
@@ -36,7 +36,7 @@ data class ParticipanteRequest(
         cpf = cpf.filter(Char::isDigit)
     )
 
-    // Recebe o hash já pronto: quem chama é que sabe qual PasswordEncoder usar.
+    // Recebe o hash pronto: quem chama e que sabe qual PasswordEncoder usar.
     fun toEntity(senhaHash: String): Participante = Participante(
         nome = nome,
         email = email,
@@ -69,7 +69,7 @@ data class ParticipantePatchRequest(
     )
 }
 
-// Corpo de PATCH /participantes/{id}/status. Só ATIVO ou INATIVO: excluir é pelo DELETE.
+// Corpo de PATCH /participantes/{id}/status. So aceita ATIVO ou INATIVO; excluir e pelo DELETE.
 data class AlterarStatusParticipanteRequest(
     @field:NotNull(message = "O status é obrigatório")
     val status: StatusUsuario? = null,

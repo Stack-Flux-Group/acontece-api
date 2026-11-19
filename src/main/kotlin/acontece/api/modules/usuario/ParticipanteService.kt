@@ -15,11 +15,10 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class ParticipanteService(
     private val repository: ParticipanteRepository,
-    // O e-mail é único entre TODOS os usuários (participantes e organizadores), então a checagem
-    // olha a tabela de usuários, não só a de participantes.
+    // E-mail e unico pra todos os usuarios, entao a checagem olha a tabela de usuarios, nao a de participantes.
     private val usuarioRepository: UsuarioRepository,
     private val passwordEncoder: PasswordEncoder,
-    // Inativar ou excluir a conta cancela as inscrições em aberto.
+    // Inativar ou excluir a conta cancela as inscricoes em aberto.
     private val inscricaoService: InscricaoService,
     private val notificador: TelegramNotificador,
 ) {
@@ -44,7 +43,7 @@ class ParticipanteService(
     @Transactional(readOnly = true)
     fun buscarPorId(id: Long): ParticipanteResponse = obter(id).toResponse()
 
-    // Contas excluídas não aparecem; as inativas sim, para o organizador poder reativá-las.
+    // Excluida nao aparece; inativa aparece, pro organizador poder reativar.
     @Transactional(readOnly = true)
     fun listar(pageable: Pageable): Page<ParticipanteResponse> =
         repository.findAllByStatusNot(StatusUsuario.EXCLUIDO, pageable).map { it.toResponse() }
@@ -70,8 +69,8 @@ class ParticipanteService(
         return participante.toResponse()
     }
 
-    // Inativar bloqueia a conta (sem login, token recusado) e cancela as inscrições em aberto, que não
-    // voltam ao reativar. Repetir o status atual não muda nada.
+    // Inativar bloqueia o login e cancela as inscricoes em aberto (reativar nao traz elas de volta).
+    // Mandar o status atual de novo nao muda nada.
     @Transactional
     fun alterarStatus(id: Long, request: AlterarStatusParticipanteRequest): ParticipanteResponse {
         val novoStatus = requireNotNull(request.status) { "O status é obrigatório" }
@@ -86,7 +85,7 @@ class ParticipanteService(
         }
         participante.status = novoStatus
 
-        // Só avisa na mudança de verdade: repetir o status atual não notifica.
+        // So avisa quando o status muda de verdade: repetir o atual nao notifica.
         when {
             statusAnterior == StatusUsuario.ATIVO && novoStatus == StatusUsuario.INATIVO ->
                 notificador.contaInativada(participante.nome, participante.email)
@@ -96,13 +95,12 @@ class ParticipanteService(
         return participante.toResponse()
     }
 
-    // A linha não é apagada: as inscrições apontam para ela (a chave estrangeira impediria o DELETE).
-    // Os dados pessoais são apagados e a conta fica EXCLUIDO, o que, para a API, é o mesmo que não
-    // existir mais (404 em tudo e token recusado).
+    // Nao apaga a linha (as inscricoes apontam pra ela): apaga os dados pessoais e marca EXCLUIDO,
+    // o que pra API e o mesmo que nao existir mais (404 e token recusado).
     @Transactional
     fun excluir(id: Long, peloProprioParticipante: Boolean) {
         val participante = obterComTrava(id)
-        // Pega nome e e-mail antes de anonimizar: depois disso eles não existem mais.
+        // Pega nome e e-mail antes de anonimizar: depois disso eles nao existem mais.
         val nome = participante.nome
         val email = participante.email
         inscricaoService.cancelarEmAbertoDoParticipante(id)

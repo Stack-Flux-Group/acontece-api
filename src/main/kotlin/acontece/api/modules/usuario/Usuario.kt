@@ -23,8 +23,8 @@ abstract class Usuario(
     @Column(nullable = false, unique = true)
     var email: String,
 
-    // Hash BCrypt, nunca a senha pura. Nulo só em linhas antigas, criadas antes do login existir;
-    // essas contas não conseguem entrar até ganharem uma senha.
+    // Hash BCrypt, nunca a senha pura. Nulo so em conta antiga, de antes do login existir;
+    // essas nao conseguem entrar ate ganharem uma senha.
     @Column(length = 100)
     var senha: String? = null,
 
@@ -33,13 +33,12 @@ abstract class Usuario(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null
 
-    // O DEFAULT faz o `ddl-auto=update` conseguir criar a coluna NOT NULL numa tabela que já tem
-    // linhas: as contas que já existiam entram como ATIVO.
+    // O DEFAULT deixa o `ddl-auto=update` criar a coluna NOT NULL com dados: quem ja existia entra como ATIVO.
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     @ColumnDefault("'ATIVO'")
     var status: StatusUsuario = StatusUsuario.ATIVO
 
-    // Vem da própria subclasse, então não vira coluna.
+    // Vem da subclasse, entao nao vira coluna.
     abstract val papel: Papel
 }

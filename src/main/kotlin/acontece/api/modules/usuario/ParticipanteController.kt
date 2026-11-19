@@ -51,8 +51,8 @@ class ParticipanteController(
     fun listar(pageable: Pageable): PagedModel<ParticipanteResponse> =
         PagedModel(service.listar(pageable))
 
-    // Participante só mexe no próprio cadastro; o organizador mexe em qualquer um.
-    // `authentication.name` é o id do usuário (subject do token).
+    // Participante so mexe no proprio cadastro; organizador mexe em qualquer um.
+    // `authentication.name` e o id do usuario (o subject do token).
     @Operation(summary = "Buscar participante", description = "O próprio participante ou um organizador.")
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ORGANIZADOR') or #id.toString() == authentication.name")
@@ -74,7 +74,7 @@ class ParticipanteController(
                 "acabaram são canceladas e não voltam ao reativar. `ATIVO` libera a conta de novo. " +
                 "`EXCLUIDO` não é aceito (400): use o DELETE.",
     )
-    // Só organizador (regra na SecurityConfig).
+    // So organizador (regra na SecurityConfig).
     @PatchMapping("/{id}/status")
     fun alterarStatus(
         @PathVariable id: Long,

@@ -22,9 +22,8 @@ class Participante(
     override val papel: Papel
         get() = Papel.PARTICIPANTE
 
-    // Exclusão da conta: a linha fica (as inscrições apontam para ela), mas os dados pessoais somem.
-    // E-mail e CPF viram valores que nenhum cadastro real consegue ter (sem "@" e com letra), então
-    // nunca colidem com ninguém e a pessoa pode se cadastrar de novo com os mesmos dados.
+    // Exclusao: a linha fica (as inscricoes apontam pra ela), mas os dados pessoais somem.
+    // E-mail e CPF viram valores impossiveis, entao a pessoa pode se cadastrar de novo com os mesmos dados.
     fun anonimizar() {
         val id = requireNotNull(id) { "Participante ainda não persistido" }
         nome = "Participante excluído"

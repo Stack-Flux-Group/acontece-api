@@ -13,7 +13,7 @@ interface UsuarioRepository : JpaRepository<Usuario, Long> {
 
     fun existsByEmailAndIdNot(email: String, id: Long): Boolean
 
-    // Só o status, sem carregar o usuário inteiro: roda a cada requisição com token.
+    // So o status, sem carregar o usuario inteiro: roda a cada request com token.
     @Query("SELECT u.status FROM Usuario u WHERE u.id = :id")
     fun buscarStatus(@Param("id") id: Long): StatusUsuario?
 }
